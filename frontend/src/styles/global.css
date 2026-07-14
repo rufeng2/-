@@ -1,0 +1,24 @@
+*{box-sizing:border-box}html,body,#app{height:100%;margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;color:#20242c;background:#f4f6f8}button,input,textarea{font:inherit}.app-shell{display:flex;height:100%;overflow:hidden}.app-sidebar{position:relative;width:190px;flex:0 0 190px;min-width:64px;max-width:280px;background:#17211d;color:#fff;display:flex;flex-direction:column;padding:18px 12px;z-index:30}.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 24px}.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:7px;background:#2e9b69;font-weight:800}.brand strong,.brand small,.account-copy strong,.account-copy small{display:block}.brand small,.account-copy small{color:#9fb0a8;font-size:11px;margin-top:2px}.app-sidebar nav{display:flex;flex-direction:column;gap:4px;flex:1}.app-sidebar nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;color:#b9c5bf;text-decoration:none;border-radius:6px;font-size:14px}.app-sidebar nav a .el-icon{flex:0 0 20px;font-size:18px}.app-sidebar nav a:hover,.app-sidebar nav a.router-link-active{background:#26362f;color:#fff}.account{border-top:1px solid #34433d;padding:14px 6px 0;display:flex;align-items:center;gap:9px}.avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#dff3e8;color:#17633f;font-weight:700}.account-copy{min-width:0;flex:1;font-size:13px}.account-copy strong{overflow:hidden;text-overflow:ellipsis}.app-main{flex:1;min-width:0;height:100%;overflow:auto}.mobile-header{display:none}.page-surface{min-height:100%;padding:24px 28px}.page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}.page-heading h1{font-size:23px;margin:0}.page-heading p{font-size:13px;color:#667085;margin:5px 0 0}.panel{background:#fff;border:1px solid #e1e6e3;border-radius:7px}.toolbar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#19a766}.markdown-body{line-height:1.7;word-break:break-word}.markdown-body pre{overflow:auto;background:#f2f4f3;padding:12px;border-radius:6px}.shell-mask{display:none}
+@media(max-width:760px){.app-sidebar{position:fixed;inset:0 auto 0 0;transform:translateX(-100%);transition:.2s}.app-sidebar.open{transform:translateX(0)}.shell-mask{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20}.mobile-header{height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:#fff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10}.page-surface{padding:16px}.page-heading{flex-direction:column}.page-heading>div:last-child{width:100%}}
+.app-sidebar .sidebar-copy{white-space:nowrap;overflow:hidden}
+.app-sidebar.collapsed{padding-left:10px;padding-right:10px}
+.app-sidebar.collapsed .sidebar-copy{display:none}
+.app-sidebar.collapsed .brand{justify-content:center;padding-left:0;padding-right:0}
+.app-sidebar.collapsed nav a{justify-content:center;padding-left:0;padding-right:0}
+.app-sidebar.collapsed .account{justify-content:center}
+.app-sidebar.collapsed .account .avatar{display:none}
+.app-sidebar.collapsed .account .el-button{margin:0}
+.resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:4}
+.resize-handle::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .15s}
+.resize-handle:hover::after,.resizing-sidebar .resize-handle::after{background:#42b883}
+.collapse-handle{position:absolute;right:-12px;top:68px;width:24px;height:34px;border:1px solid #405048;border-radius:5px;background:#223029;color:#c7d2cc;display:grid;place-items:center;cursor:pointer;z-index:5;padding:0}
+.collapse-handle:hover{background:#2d4238;color:#fff}
+.resizing-sidebar{cursor:col-resize;user-select:none}
+.resizing-sidebar iframe{pointer-events:none}
+@media(max-width:760px){
+  .app-sidebar,.app-sidebar.collapsed{width:232px!important;flex-basis:232px!important;max-width:232px;padding:18px 12px}
+  .app-sidebar.collapsed .sidebar-copy{display:block}
+  .app-sidebar.collapsed .brand,.app-sidebar.collapsed nav a,.app-sidebar.collapsed .account{justify-content:initial}
+  .app-sidebar.collapsed .account .avatar{display:grid}
+  .resize-handle,.collapse-handle{display:none}
+}

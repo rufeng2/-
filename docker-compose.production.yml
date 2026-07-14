@@ -1,0 +1,43 @@
+services:
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["security"]
+    restart: unless-stopped
+    volumes: [clamavdata:/var/lib/clamav]
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    ports: ["9090:9090"]
+    volumes:
+      - ./ops/prometheus:/etc/prometheus:ro
+      - prometheusdata:/prometheus
+  grafana:
+    image: grafana/grafana:11.1.4
+    profiles: ["observability"]
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    secrets: [grafana_admin_password]
+  opensearch:
+    image: opensearchproject/opensearch:2.16.0
+    profiles: ["search"]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["9200:9200"]
+    volumes: [opensearchdata:/usr/share/opensearch/data]
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password
+volumes:
+  clamavdata:
+  prometheusdata:
+  grafanadata:
+  opensearchdata:

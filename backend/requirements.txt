@@ -1,0 +1,53 @@
+# ===== FastAPI 生态 =====
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# ===== 数据库 =====
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0
+alembic>=1.13.0
+pgvector>=0.3.0  # pgvector SQLAlchemy 类型支持
+
+# ===== 认证 =====
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.1.0
+passlib[bcrypt]>=1.7.4
+
+# ===== HTTP 客户端 =====
+httpx>=0.27.0
+
+# ===== 文档解析 =====
+python-multipart>=0.0.9
+pypdf2>=3.0.0
+PyMuPDF>=1.24.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-pptx>=0.6.23
+
+# ===== AI SDK =====
+dashscope>=1.20.0
+openai>=1.30.0  # 兼容 DeepSeek API
+Pillow>=10.0.0
+
+# ===== OCR =====
+# paddlepaddle>=2.6.0  # 根据 CUDA 版本选择
+# paddleocr>=2.8.0     # 取消注释以启用 OCR 功能
+
+# ===== NLP =====
+jieba>=0.42.1
+
+# ===== 精排模型（可选）=====
+# 如需本地精排能力，取消注释下一行（会安装 PyTorch ~900MB）
+# sentence-transformers>=3.0.0  # BGE Reranker（未装则自动降级）
+
+# ===== 工具 =====
+python-dotenv>=1.0.0
+redis>=5.0.0
+celery>=5.4.0
+boto3>=1.34.0  # MinIO S3 SDK
+sse-starlette>=2.0.0
+
+prometheus-client>=0.20.0
+ldap3>=2.9.1
