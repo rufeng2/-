@@ -7,10 +7,11 @@ import re
 
 from backend.config import settings
 from backend.services.llm_gateway import llm_gateway
+from backend.services.cache_service import cache_service
 from backend.utils.logger import logger
 
 
-INTENTS = {"knowledge_qa", "document_search", "greeting", "capability", "clarification", "sensitive_action", "out_of_scope"}
+INTENTS = {"knowledge_qa", "document_search", "memory_update", "greeting", "capability", "clarification", "sensitive_action", "out_of_scope"}
 DOMAINS = {"human_resources", "finance", "procurement", "it_security", "customer_service", "project_management", "data_governance", "administration", "general"}
 
 
@@ -37,6 +38,7 @@ class BusinessIntentRouter:
         r"|(导出|泄露|获取).{0,12}(全部|所有).{0,8}(密码|账号)"
     )
     _vague = re.compile(r"^(这个|那个|怎么办|为什么|还有呢|继续|详细说说|帮我看看)[？?。\s]*$")
+    _memory_update = re.compile(r"(请记住|记住|以后请|我偏好|我习惯|我的部门是|我的岗位是)")
     _domain_patterns = {
         "human_resources": re.compile(r"(员工|入职|离职|转正|绩效|薪酬|年假|人事|招聘)"),
         "finance": re.compile(r"(财务|报销|发票|预算|付款|差旅|费用)"),
@@ -70,6 +72,8 @@ class BusinessIntentRouter:
             return self._decision("capability", "general", "direct", 0.98, "assistant capability question", "rule")
         if self._document_search.search(compact):
             return self._decision("document_search", domain, "search", 0.95, "source document lookup", "rule")
+        if self._memory_update.search(compact):
+            return self._decision("memory_update", domain, "direct", 0.98, "explicit long-term memory request", "rule")
         if len(compact) <= 2 or self._vague.fullmatch(compact):
             return self._decision("clarification", domain, "clarify", 0.96, "missing searchable business subject", "rule")
         return None
@@ -92,8 +96,14 @@ class BusinessIntentRouter:
         if not settings.INTENT_ROUTER_USE_LLM:
             return self._decision("knowledge_qa", fallback_domain, "rag", 0.60, "LLM routing disabled", "fallback")
         history_text = "\n".join(f"{item.get('role', '')}: {item.get('content', '')[:200]}" for item in (history or [])[-4:])
+        intent_cache_key = await cache_service.build_key("intent", {"query": query.strip(), "history": history_text})
+        cached = await cache_service.get_json("intent", intent_cache_key)
+        if isinstance(cached, dict) and cached.get("intent") in INTENTS and cached.get("domain") in DOMAINS:
+            intent = str(cached["intent"])
+            action = {"knowledge_qa": "rag", "document_search": "search", "memory_update": "direct", "greeting": "direct", "capability": "direct", "clarification": "clarify", "sensitive_action": "deny", "out_of_scope": "direct"}[intent]
+            return self._decision(intent, str(cached["domain"]), action, float(cached.get("confidence", 0.8)), str(cached.get("reason", "cached classification")), "cache")
         prompt = f"""Classify an enterprise knowledge assistant request. Return one JSON object only:
-{{"intent":"knowledge_qa|document_search|greeting|capability|clarification|sensitive_action|out_of_scope","domain":"human_resources|finance|procurement|it_security|customer_service|project_management|data_governance|administration|general","confidence":0.0,"reason":"short reason"}}
+{{"intent":"knowledge_qa|document_search|memory_update|greeting|capability|clarification|sensitive_action|out_of_scope","domain":"human_resources|finance|procurement|it_security|customer_service|project_management|data_governance|administration|general","confidence":0.0,"reason":"short reason"}}
 knowledge_qa asks for enterprise facts, policies, processes or explanations. document_search asks to locate source documents. clarification lacks a concrete subject. sensitive_action asks to execute privileged, destructive or data-exfiltration operations; questions about those policies are knowledge_qa. out_of_scope is unrelated to enterprise knowledge.
 History: {history_text or '(none)'}
 Request: {query}"""
@@ -105,8 +115,10 @@ Request: {query}"""
             confidence = float(parsed.get("confidence", 0.0))
             if intent not in INTENTS or domain not in DOMAINS or confidence < settings.INTENT_ROUTER_CONFIDENCE_THRESHOLD:
                 raise ValueError("invalid or low-confidence intent response")
-            action = {"knowledge_qa": "rag", "document_search": "search", "greeting": "direct", "capability": "direct", "clarification": "clarify", "sensitive_action": "deny", "out_of_scope": "direct"}[intent]
-            return self._decision(intent, domain, action, confidence, str(parsed.get("reason", "semantic classification")), "llm")
+            action = {"knowledge_qa": "rag", "document_search": "search", "memory_update": "direct", "greeting": "direct", "capability": "direct", "clarification": "clarify", "sensitive_action": "deny", "out_of_scope": "direct"}[intent]
+            decision = self._decision(intent, domain, action, confidence, str(parsed.get("reason", "semantic classification")), "llm")
+            await cache_service.set_json("intent", intent_cache_key, decision.public_payload(), settings.INTENT_CACHE_TTL_SECONDS)
+            return decision
         except Exception as exc:
             logger.warning("Intent routing failed, using knowledge QA fallback: %s", exc)
             return self._decision("knowledge_qa", fallback_domain, "rag", 0.50, "classifier unavailable; safe retrieval fallback", "fallback")
@@ -119,6 +131,7 @@ Request: {query}"""
             "clarification": "请补充具体的业务对象或问题，例如制度名称、流程环节、项目或文档主题。",
             "sensitive_action": "我不能执行删除、修改权限、导出敏感数据等高风险操作。你可以询问相关制度或申请流程。",
             "out_of_scope": "这个问题不属于当前企业知识库的服务范围。请改为询问公司制度、流程、项目或文档内容。",
+            "memory_update": "我已记住这项偏好，后续对话会在相关问题中参考。",
         }
         return answers.get(decision.intent, "请补充你希望查询的具体内容。")
 

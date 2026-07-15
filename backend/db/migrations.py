@@ -80,6 +80,21 @@ async def ensure_runtime_schema() -> None:
         "ALTER TABLE evaluation_runs ADD COLUMN IF NOT EXISTS progress INT DEFAULT 100",
         "ALTER TABLE evaluation_runs ADD COLUMN IF NOT EXISTS error_message TEXT DEFAULT ''",
         "ALTER TABLE evaluation_runs ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '{}'",
+        """
+        CREATE TABLE IF NOT EXISTS long_term_memories (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            kind VARCHAR(30) DEFAULT 'task_summary',
+            content TEXT NOT NULL,
+            metadata JSONB DEFAULT '{}',
+            embedding vector(1024),
+            importance SMALLINT DEFAULT 50,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_long_memory_user ON long_term_memories(user_id, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_long_memory_embedding_hnsw ON long_term_memories USING hnsw (embedding vector_cosine_ops) WITH (m=12, ef_construction=48)",
         "CREATE INDEX IF NOT EXISTS idx_docs_knowledge_base ON documents(knowledge_base_id)",
         "CREATE INDEX IF NOT EXISTS idx_chunks_content_trgm ON document_chunks USING gin (content gin_trgm_ops)",
         "CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw ON document_chunks USING hnsw (embedding vector_cosine_ops) WITH (m=16, ef_construction=64)",

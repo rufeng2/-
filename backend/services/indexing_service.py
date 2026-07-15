@@ -14,6 +14,7 @@ from backend.services.embedding_service import embedding_service
 from backend.services.llm_gateway import llm_gateway
 from backend.config import settings
 from backend.utils.logger import logger
+from backend.services.cache_service import cache_service
 
 
 def _attach_parent_blocks(chunks: list[dict], max_parent_chars: int = 1800) -> list[dict]:
@@ -142,6 +143,7 @@ async def index_document(doc_id: str | UUID, db: AsyncSession) -> int:
         doc.page_count = result.page_count
         doc.status = "indexed"
         await db.flush()
+        await cache_service.bump_version("index")
         logger.info("Indexed document %s: %s cleaned child chunks, quality=%.2f", doc.id, len(contents), cleaned.report["quality_score"])
         return len(contents)
     except Exception as exc:

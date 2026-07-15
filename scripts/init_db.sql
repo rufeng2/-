@@ -155,6 +155,21 @@ CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_msg_feedback ON messages(feedback);
 
+CREATE TABLE IF NOT EXISTS long_term_memories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(30) DEFAULT 'task_summary',
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    embedding vector(1024),
+    importance SMALLINT DEFAULT 50,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_long_memory_user ON long_term_memories(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_long_memory_embedding_hnsw ON long_term_memories
+  USING hnsw (embedding vector_cosine_ops) WITH (m = 12, ef_construction = 48);
+
 -- ====================================================
 -- 默认部门
 -- ====================================================

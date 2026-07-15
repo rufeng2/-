@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     RERANKER_MODEL: str = "gte-rerank-v2"
     INTENT_ROUTER_USE_LLM: bool = True
     INTENT_ROUTER_CONFIDENCE_THRESHOLD: float = 0.65
+    RAG_CACHE_ENABLED: bool = True
+    RETRIEVAL_CACHE_TTL_SECONDS: int = 600
+    ANSWER_CACHE_TTL_SECONDS: int = 900
+    INTENT_CACHE_TTL_SECONDS: int = 3600
+    REFLECTION_ENABLED: bool = True
+    REFLECTION_USE_LLM: bool = True
+    LONG_TERM_MEMORY_ENABLED: bool = True
+    LONG_TERM_MEMORY_TOP_K: int = 3
+    LONG_TERM_MEMORY_MAX_PER_USER: int = 100
 
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin123456"

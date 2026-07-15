@@ -12,6 +12,9 @@ RAG_PROMPT = ChatPromptTemplate.from_messages([
         """## 检索到的知识库内容
 {context}
 
+## Relevant user memory
+{memory}
+
 ## 用户问题
 {question}
 

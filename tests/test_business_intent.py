@@ -28,14 +28,32 @@ class BusinessIntentRuleTests(unittest.TestCase):
 class BusinessIntentSemanticTests(unittest.IsolatedAsyncioTestCase):
     async def test_uses_structured_llm_classification(self):
         response = json.dumps({"intent": "knowledge_qa", "domain": "finance", "confidence": 0.92, "reason": "expense policy"})
-        with patch("backend.services.business_intent.llm_gateway.chat", new=AsyncMock(return_value=response)):
+        with (
+            patch("backend.services.business_intent.cache_service.get_json", new=AsyncMock(return_value=None)),
+            patch("backend.services.business_intent.cache_service.set_json", new=AsyncMock()),
+            patch("backend.services.business_intent.llm_gateway.chat", new=AsyncMock(return_value=response)),
+        ):
             decision = await BusinessIntentRouter().route("差旅费用超标后应该怎么审批")
         self.assertEqual((decision.intent, decision.domain, decision.action, decision.source), ("knowledge_qa", "finance", "rag", "llm"))
 
     async def test_falls_back_safely_on_invalid_classifier_output(self):
-        with patch("backend.services.business_intent.llm_gateway.chat", new=AsyncMock(return_value="not-json")):
+        with (
+            patch("backend.services.business_intent.cache_service.get_json", new=AsyncMock(return_value=None)),
+            patch("backend.services.business_intent.cache_service.set_json", new=AsyncMock()),
+            patch("backend.services.business_intent.llm_gateway.chat", new=AsyncMock(return_value="not-json")),
+        ):
             decision = await BusinessIntentRouter().route("介绍供应商准入要求")
         self.assertEqual((decision.intent, decision.action, decision.source), ("knowledge_qa", "rag", "fallback"))
+
+    async def test_uses_cached_semantic_classification(self):
+        cached = {"intent": "knowledge_qa", "domain": "human_resources", "confidence": 0.88, "reason": "cached"}
+        with (
+            patch("backend.services.business_intent.cache_service.get_json", new=AsyncMock(return_value=cached)),
+            patch("backend.services.business_intent.llm_gateway.chat", new=AsyncMock()) as chat,
+        ):
+            decision = await BusinessIntentRouter().route("cached question")
+        self.assertEqual((decision.intent, decision.domain, decision.source), ("knowledge_qa", "human_resources", "cache"))
+        chat.assert_not_awaited()
 
 
 if __name__ == "__main__":

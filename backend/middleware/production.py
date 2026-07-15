@@ -7,12 +7,12 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from prometheus_client import Counter, Histogram
-from redis.asyncio import Redis
 
 from backend.config import settings
 from backend.db.models import AuditLog
 from backend.db.session import AsyncSessionLocal
 from backend.utils.logger import logger
+from backend.services.cache_service import cache_service
 
 REQUESTS = Counter("rag_http_requests_total", "HTTP requests", ["method", "path", "status"])
 LATENCY = Histogram("rag_http_request_duration_seconds", "HTTP request latency", ["method", "path"])
@@ -34,7 +34,7 @@ def _identity(request: Request) -> tuple[str, str]:
 
 
 async def _allow_request(identity: str) -> tuple[bool, int]:
-    redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    redis = cache_service.redis
     try:
         minute = int(time.time() // 60)
         day = int(time.time() // 86400)
@@ -51,8 +51,6 @@ async def _allow_request(identity: str) -> tuple[bool, int]:
     except Exception as exc:
         logger.warning(f"Rate limiter unavailable, failing open: {exc}")
         return True, settings.RATE_LIMIT_PER_MINUTE
-    finally:
-        await redis.aclose()
 
 
 async def production_middleware(request: Request, call_next):
