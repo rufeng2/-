@@ -21,7 +21,8 @@ REQUESTS = Counter("rag_http_requests_total", "HTTP requests", ["method", "path"
 LATENCY = Histogram("rag_http_request_duration_seconds", "HTTP request latency", ["method", "path"])
 ERRORS = Counter("rag_http_errors_total", "Unhandled HTTP errors", ["path"])
 EXPENSIVE_PATHS = ("/api/chat/send", "/api/documents/upload", "/api/evaluation/runs")
-LOCAL_AUTH_PATHS = {"/api/login", "/api/register"}
+LOCAL_DEMO_FAIL_OPEN_PATHS = {"/api/login", "/api/register"}
+LOCAL_DEMO_FAIL_OPEN_PREFIXES = ("/api/ecommerce/",)
 _expensive = asyncio.Semaphore(settings.MAX_CONCURRENT_EXPENSIVE_REQUESTS)
 _UUID_SEGMENT = re.compile(r"^[0-9a-f]{8}-[0-9a-f-]{27,}$", re.I)
 _NUMBER_SEGMENT = re.compile(r"^\d+$")
@@ -67,7 +68,10 @@ async def _allow_request(identity: str, fail_closed: bool = False) -> tuple[bool
 
 
 def _rate_limit_fail_closed(method: str, path: str) -> bool:
-    if settings.APP_ENV.lower() != "production" and path in LOCAL_AUTH_PATHS:
+    if settings.APP_ENV.lower() != "production" and (
+        path in LOCAL_DEMO_FAIL_OPEN_PATHS
+        or any(path.startswith(prefix) for prefix in LOCAL_DEMO_FAIL_OPEN_PREFIXES)
+    ):
         return False
     return method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
 

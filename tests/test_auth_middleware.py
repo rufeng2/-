@@ -70,10 +70,28 @@ def test_login_fails_open_when_rate_limiter_is_unavailable_in_development(monkey
     assert calls["fail_closed"] is False
 
 
+def test_ecommerce_agent_fails_open_when_rate_limiter_is_unavailable_in_development(monkeypatch):
+    monkeypatch.setattr(production.settings, "APP_ENV", "development")
+
+    response, calls = _run_middleware(monkeypatch, "POST", "/api/ecommerce/agent/analyze")
+
+    assert response.status_code == 200
+    assert calls["fail_closed"] is False
+
+
 def test_register_fails_closed_when_rate_limiter_is_unavailable_in_production(monkeypatch):
     monkeypatch.setattr(production.settings, "APP_ENV", "production")
 
     response, calls = _run_middleware(monkeypatch, "POST", "/api/register")
+
+    assert response.status_code == 503
+    assert calls["fail_closed"] is True
+
+
+def test_ecommerce_agent_fails_closed_when_rate_limiter_is_unavailable_in_production(monkeypatch):
+    monkeypatch.setattr(production.settings, "APP_ENV", "production")
+
+    response, calls = _run_middleware(monkeypatch, "POST", "/api/ecommerce/agent/analyze")
 
     assert response.status_code == 503
     assert calls["fail_closed"] is True
