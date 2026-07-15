@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime, timezone
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -124,3 +125,53 @@ class ProductAnalysis(BaseModel):
     ad_roi: float
     average_rating: float
     risk_tags: list[str]
+
+
+class ToolTraceStep(BaseModel):
+    tool_name: str
+    input: dict[str, str | int | float | bool]
+    output_summary: str
+
+
+class RecommendedAction(BaseModel):
+    id: str
+    title: str
+    action_type: str
+    risk_level: str
+    reason: str
+    expected_impact: str
+    evidence: list[Evidence]
+    status: str = "pending"
+    operator: str = ""
+    updated_at: str = ""
+
+    @staticmethod
+    def create(
+        title: str,
+        action_type: str,
+        risk_level: str,
+        reason: str,
+        expected_impact: str,
+        evidence: list[Evidence],
+    ) -> "RecommendedAction":
+        return RecommendedAction(
+            id=str(uuid4()),
+            title=title,
+            action_type=action_type,
+            risk_level=risk_level,
+            reason=reason,
+            expected_impact=expected_impact,
+            evidence=evidence,
+            updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        )
+
+
+class AgentAnalysis(BaseModel):
+    question: str
+    intent: str
+    summary: str
+    tool_trace: list[ToolTraceStep]
+    evidence: list[Evidence]
+    recommendations: list[RecommendedAction]
+    risk_level: str
+    confidence: float
