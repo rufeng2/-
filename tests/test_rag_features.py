@@ -6,12 +6,27 @@ from docx import Document as WordDocument
 from backend.core.rag_pipeline import RAGPipeline
 from backend.services.indexing_service import _attach_parent_blocks
 from backend.services.query_rewriter import QueryRewriter
+from backend.services.retrieval_policy import RetrievalPolicy
 from backend.services.evaluation_service import retrieval_metrics
 from backend.db.models import EvaluationItem
 from backend.services.document_parser import DocumentParser
 
 
 class RagFeatureTests(unittest.TestCase):
+    def test_retrieval_policy_adapts_to_query_complexity(self):
+        policy = RetrievalPolicy()
+        fact = policy.plan("报销上限是多少", base_recall=20, base_final=6)
+        standard = policy.plan("介绍公司的采购审批制度", base_recall=20, base_final=6)
+        complex_query = policy.plan(
+            "请分析采购审批和合同用印流程的差异，以及各自风险、依据和处理步骤",
+            base_recall=20,
+            base_final=6,
+        )
+
+        self.assertEqual((fact.tier, fact.recall_k, fact.final_k), ("fact", 10, 4))
+        self.assertEqual((standard.tier, standard.recall_k, standard.final_k), ("standard", 20, 6))
+        self.assertEqual((complex_query.tier, complex_query.recall_k, complex_query.final_k), ("complex", 40, 10))
+
     def test_rrf_combines_rankings(self):
         vector = [{"chunk_id": "a", "search_type": "vector"}, {"chunk_id": "b", "search_type": "vector"}]
         keyword = [{"chunk_id": "b", "search_type": "keyword"}, {"chunk_id": "c", "search_type": "keyword"}]

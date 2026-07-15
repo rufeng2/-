@@ -17,6 +17,8 @@ from backend.services.llm_gateway import llm_gateway
 from backend.services.embedding_service import embedding_service
 from backend.services.reranker_service import reranker
 from backend.services.query_rewriter import query_rewriter
+from backend.services.retrieval_policy import retrieval_policy
+from backend.services.business_intent import business_intent_router
 from backend.services.storage_service import storage_service
 from backend.utils.logger import logger
 from backend.langchain_app.retriever import EnterpriseRetriever, documents_to_results
@@ -55,8 +57,13 @@ class RAGPipeline:
         query_image_path: str = "",
     ) -> list[dict]:
         """Dense + lexical retrieval, standard RRF fusion, reranking and parent expansion."""
-        final_k = top_k or settings.RETRIEVAL_RERANK_TOP_K
-        recall_k = max(self.top_k, final_k)
+        plan = retrieval_policy.plan(
+            query,
+            base_recall=self.top_k,
+            base_final=settings.RETRIEVAL_RERANK_TOP_K,
+        )
+        final_k = top_k or plan.final_k
+        recall_k = max(self.top_k, final_k) if top_k is not None else plan.recall_k
         query_emb = await embedding_service.embed_multimodal(query, query_image_path) if query_image_path else await embedding_service.embed_multimodal_query(query)
         vector_results = await self._vector_search(query_emb, db, user_department, recall_k * 3, knowledge_base_ids) if query_emb else []
         keyword_results = await self._keyword_search(query, db, user_department, recall_k * 2, knowledge_base_ids)
@@ -64,7 +71,10 @@ class RAGPipeline:
         reranked = await reranker.rerank(query, fused, min(len(fused), max(final_k * 4, final_k)))
         diversified = self._diversify_results(reranked, final_k)
         expanded = self._expand_parent_chunks(diversified)
-        logger.info("Search query=%r vector=%s keyword=%s fused=%s reranked=%s", query, len(vector_results), len(keyword_results), len(fused), len(expanded))
+        logger.info(
+            "Search query=%r tier=%s recall_k=%s final_k=%s vector=%s keyword=%s fused=%s reranked=%s",
+            query, plan.tier, recall_k, final_k, len(vector_results), len(keyword_results), len(fused), len(expanded),
+        )
         return expanded
 
     @staticmethod
@@ -372,13 +382,50 @@ class RAGPipeline:
 
         # Rewrite only the retrieval query; keep the original question for the answer.
         prior_history = await self._get_history(conv_id, db)
-        retrieval_query = await query_rewriter.rewrite(query, prior_history)
+        fast_intent = business_intent_router.fast_route(query, has_images=bool(user_image_paths))
+        if fast_intent and fast_intent.action != "rag":
+            retrieval_query = query
+        else:
+            retrieval_query = await query_rewriter.rewrite(query, prior_history)
         if retrieval_query != query:
             yield f"data: {json.dumps({'rewritten_query': retrieval_query}, ensure_ascii=False)}\n\n"
+        intent = fast_intent or await business_intent_router.route(retrieval_query, prior_history, has_images=bool(user_image_paths))
+        logger.info(
+            "Intent routed intent=%s domain=%s action=%s confidence=%.2f source=%s",
+            intent.intent,
+            intent.domain,
+            intent.action,
+            intent.confidence,
+            intent.source,
+        )
+        yield f"data: {json.dumps({'intent': intent.public_payload()}, ensure_ascii=False)}\n\n"
         # 保存用户消息
         user_msg_id = await self._save_message(conv_id, "user", query, [], db)
         if user_msg_id:
             yield f"data: {json.dumps({'user_msg_id': user_msg_id}, ensure_ascii=False)}\n\n"
+
+        if intent.action in {"direct", "clarify", "deny"}:
+            answer = business_intent_router.direct_answer(intent)
+            yield f"data: {json.dumps({'token': answer}, ensure_ascii=False)}\n\n"
+            msg_id = await self._save_message(conv_id, "assistant", answer, [], db)
+            if is_new:
+                conv = (await db.execute(select(Conversation).where(Conversation.id == UUID(conv_id)))).scalar_one_or_none()
+                if conv:
+                    conv.title = query[:30] + ("..." if len(query) > 30 else "")
+            for attachment_path in user_image_paths or []:
+                try:
+                    storage_service.delete(attachment_path)
+                except Exception as exc:
+                    logger.warning("Chat attachment cleanup failed: %s", exc)
+            payload = {
+                "done": True,
+                "conversation_id": conv_id,
+                "message_id": msg_id,
+                "references": [],
+                "intent": intent.public_payload(),
+            }
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            return
 
         # ---- Step 2: 检索 ----
         retriever = EnterpriseRetriever(
@@ -391,6 +438,31 @@ class RAGPipeline:
         results = documents_to_results(documents)
         context = self._build_context(results)
         references = self._build_references(results)
+
+        if intent.action == "search":
+            if references:
+                lines = ["找到以下相关文档："]
+                for index, ref in enumerate(references, 1):
+                    location = f"（第 {ref['page']} 页）" if ref.get("page") else ""
+                    lines.append(f"{index}. {ref['title']}{location}")
+                answer = "\n".join(lines)
+            else:
+                answer = "没有找到匹配的可访问文档，请补充文档名称、业务主题或关键词。"
+            yield f"data: {json.dumps({'token': answer}, ensure_ascii=False)}\n\n"
+            msg_id = await self._save_message(conv_id, "assistant", answer, references, db)
+            if is_new:
+                conv = (await db.execute(select(Conversation).where(Conversation.id == UUID(conv_id)))).scalar_one_or_none()
+                if conv:
+                    conv.title = query[:30] + ("..." if len(query) > 30 else "")
+            payload = {
+                "done": True,
+                "conversation_id": conv_id,
+                "message_id": msg_id,
+                "references": references,
+                "intent": intent.public_payload(),
+            }
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            return
 
         # ---- Step 3: 检查是否为图片/多模态问题 ----
         has_image_docs = any(r.get("content_type") == "image" for r in results) or bool(user_image_paths)
@@ -506,6 +578,7 @@ class RAGPipeline:
             'conversation_id': conv_id,
             'message_id': msg_id,
             'references': references,
+            'intent': intent.public_payload(),
         }
         yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 

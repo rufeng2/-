@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     RETRIEVAL_USE_RERANK: bool = True
     RRF_K: int = 60
     RERANKER_MODEL: str = "gte-rerank-v2"
+    INTENT_ROUTER_USE_LLM: bool = True
+    INTENT_ROUTER_CONFIDENCE_THRESHOLD: float = 0.65
 
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin123456"
