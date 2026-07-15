@@ -1,27 +1,23 @@
-"""
-多模态企业知识库 RAG 系统 - 主服务入口
-FastAPI async + PostgreSQL pgvector + DashScope LLM
-"""
+"""智能电商运营 Agent 平台 - FastAPI service entrypoint."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-
-from backend.config import settings
-from backend.utils.logger import logger
-from backend.api import auth, documents, chat, admin, knowledge_bases, evaluation, enterprise_auth, operations, health
-from backend.services.llm_gateway import llm_gateway
-from backend.services.reranker_service import reranker
-from backend.security.production_config import assert_production_settings
-from backend.middleware.production import production_middleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from backend.api import admin, auth, chat, documents, enterprise_auth, evaluation, health, knowledge_bases, operations
+from backend.config import settings
+from backend.middleware.production import production_middleware
+from backend.security.production_config import assert_production_settings
+from backend.services.reranker_service import reranker
+from backend.utils.logger import logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期"""
+    """Application lifecycle."""
     logger.info("=" * 50)
-    logger.info("📚 多模态企业知识库 RAG 系统启动")
+    logger.info("智能电商运营 Agent 平台启动")
     logger.info(f"环境: {settings.APP_ENV}")
     logger.info(f"LLM 模型: {settings.LLM_MODEL}")
     logger.info(f"嵌入维度: {settings.EMBEDDING_DIM}")
@@ -32,8 +28,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="企业知识库 RAG 系统",
-    description="多模态企业知识库智能问答系统，支持文档上传、权限管理、RAG 对话",
+    title="智能电商运营 Agent 平台",
+    description="基于模拟电商经营数据、工具调用和审批闭环的 AI 运营决策系统",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -66,17 +62,17 @@ app.include_router(health.router)
 
 
 @app.get("/api/health")
-async def health():
-    """健康检查 + 各模型状态"""
+async def health_check():
+    """Health check and model capability summary."""
     return {
         "status": "ok",
-        "app": "knowledge-rag",
+        "app": "ecommerce-operations-agent",
         "models": {
-            "chat": f"{settings.LLM_MODEL} (DeepSeek V4)",
-            "orchestration": "LangChain Runnable",
-            "embedding": "text-embedding-v3 + multimodal-embedding-v1 (unified)",
+            "chat": f"{settings.LLM_MODEL} (optional LLM enhancement)",
+            "orchestration": "Deterministic ecommerce tools + optional LangChain Runnable",
+            "embedding": "text-embedding-v3 + multimodal-embedding-v1 (for operations knowledge base)",
             "reranker": reranker.get_model_info(),
-            "vision": "qwen-vl-plus (DashScope, 需 DASHSCOPE_API_KEY)" if settings.DASHSCOPE_API_KEY else "未配置",
+            "vision": "qwen-vl-plus (DashScope, optional)" if settings.DASHSCOPE_API_KEY else "not configured",
         },
         "config": {
             "retrieval_top_k": settings.RETRIEVAL_TOP_K,
@@ -88,12 +84,13 @@ async def health():
 
 @app.get("/")
 async def root():
-    """根路径"""
+    """Root route."""
     return {
-        "app": "企业知识库 RAG 系统",
+        "app": "智能电商运营 Agent 平台",
         "docs": "/docs",
         "openapi": "/openapi.json",
         "version": "1.0.0",
+        "primary_workflow": "/api/ecommerce/dashboard",
     }
 
 

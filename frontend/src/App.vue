@@ -7,24 +7,33 @@
       :style="{ width: sidebarWidth + 'px', flexBasis: sidebarWidth + 'px' }"
     >
       <div class="brand">
-        <span class="brand-mark">K</span>
-        <div class="sidebar-copy"><strong>企业知识库</strong><small>RAG Workspace</small></div>
+        <span class="brand-mark">E</span>
+        <div class="sidebar-copy">
+          <strong>智能电商运营 Agent 平台</strong>
+          <small>Agent Workspace</small>
+        </div>
       </div>
       <nav>
-        <router-link to="/chat" title="智能问答"><el-icon><ChatDotRound /></el-icon><span class="sidebar-copy">智能问答</span></router-link>
-        <router-link to="/documents" title="文档与知识库"><el-icon><Files /></el-icon><span class="sidebar-copy">文档与知识库</span></router-link>
-        <router-link v-if="auth.isAdmin" to="/evaluation" title="自动评测"><el-icon><DataAnalysis /></el-icon><span class="sidebar-copy">自动评测</span></router-link>
-        <router-link v-if="auth.isAdmin" to="/admin" title="管理与运维"><el-icon><Setting /></el-icon><span class="sidebar-copy">管理与运维</span></router-link>
+        <router-link to="/dashboard" title="运营驾驶舱"><el-icon><DataBoard /></el-icon><span class="sidebar-copy">运营驾驶舱</span></router-link>
+        <router-link to="/agent" title="运营 Agent"><el-icon><ChatDotRound /></el-icon><span class="sidebar-copy">运营 Agent</span></router-link>
+        <router-link to="/products" title="商品分析"><el-icon><Goods /></el-icon><span class="sidebar-copy">商品分析</span></router-link>
+        <router-link to="/campaigns" title="活动策略"><el-icon><Calendar /></el-icon><span class="sidebar-copy">活动策略</span></router-link>
+        <router-link to="/recommendations" title="建议审批"><el-icon><Checked /></el-icon><span class="sidebar-copy">建议审批</span></router-link>
+        <router-link to="/knowledge" title="运营知识库"><el-icon><Files /></el-icon><span class="sidebar-copy">运营知识库</span></router-link>
+        <router-link v-if="auth.isAdmin" to="/evaluation" title="分析质量评测"><el-icon><DataAnalysis /></el-icon><span class="sidebar-copy">质量评测</span></router-link>
+        <router-link v-if="auth.isAdmin" to="/admin" title="运营管理后台"><el-icon><Setting /></el-icon><span class="sidebar-copy">运营管理</span></router-link>
       </nav>
       <div class="account">
         <div class="avatar">{{ auth.username.slice(0, 1).toUpperCase() }}</div>
         <div class="account-copy sidebar-copy"><strong>{{ auth.username }}</strong><small>{{ roleName }}</small></div>
         <el-dropdown trigger="click">
           <el-button text circle title="账号菜单"><el-icon><MoreFilled /></el-icon></el-button>
-          <template #dropdown><el-dropdown-menu>
-            <el-dropdown-item @click="exportData">导出我的数据</el-dropdown-item>
-            <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-          </el-dropdown-menu></template>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportData">导出我的数据</el-dropdown-item>
+              <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
         </el-dropdown>
       </div>
 
@@ -43,7 +52,7 @@
     <main class="app-main">
       <header class="mobile-header">
         <el-button text circle @click="mobileOpen = true"><el-icon><Menu /></el-icon></el-button>
-        <strong>企业知识库</strong><span></span>
+        <strong>智能电商运营</strong><span></span>
       </header>
       <router-view />
     </main>
@@ -61,13 +70,13 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const mobileOpen = ref(false)
-const savedWidth = Number(localStorage.getItem("sidebar-width") || 190)
+const savedWidth = Number(localStorage.getItem("sidebar-width") || 204)
 const sidebarWidth = ref(Math.min(280, Math.max(150, savedWidth)))
 const previousWidth = ref(sidebarWidth.value)
 const collapsed = ref(localStorage.getItem("sidebar-collapsed") === "true")
 if (collapsed.value) sidebarWidth.value = 64
 
-const roleName = computed(() => ({ admin: "系统管理员", editor: "知识库编辑", viewer: "只读用户", user: "普通用户" } as any)[auth.role] || auth.role)
+const roleName = computed(() => ({ admin: "运营管理员", editor: "运营编辑", viewer: "只读用户", user: "运营用户" } as any)[auth.role] || auth.role)
 watch(() => route.path, () => { mobileOpen.value = false })
 
 function toggleCollapsed() {
@@ -76,7 +85,7 @@ function toggleCollapsed() {
     previousWidth.value = sidebarWidth.value
     sidebarWidth.value = 64
   } else {
-    sidebarWidth.value = Math.max(150, previousWidth.value || 190)
+    sidebarWidth.value = Math.max(150, previousWidth.value || 204)
   }
   localStorage.setItem("sidebar-collapsed", String(collapsed.value))
 }
@@ -109,10 +118,14 @@ async function exportData() {
   const blob = new Blob([JSON.stringify(response.data.data, null, 2)], { type: "application/json" })
   const link = document.createElement("a")
   link.href = URL.createObjectURL(blob)
-  link.download = "knowledge-rag-" + auth.username + ".json"
+  link.download = "ecommerce-agent-" + auth.username + ".json"
   link.click()
   URL.revokeObjectURL(link.href)
   ElMessage.success("个人数据已导出")
 }
-function logout() { auth.logout(); router.push("/") }
+
+function logout() {
+  auth.logout()
+  router.push("/")
+}
 </script>

@@ -1,67 +1,41 @@
-# 📚 多模态企业知识库 RAG 系统
+# 智能电商运营 Agent 平台
 
-基于大模型的企业内部知识库智能问答系统，支持多格式文档上传、智能检索、多轮对话、权限管理。
+基于 FastAPI、Vue 3、LangChain/RAG 和模拟电商经营数据构建的 AI 运营决策系统。项目聚焦 AI Agent 工程能力和数据分析能力，支持运营驾驶舱、经营异常诊断、商品分层、活动策略生成、广告 ROI 分析、库存风险识别和人工审批闭环。
+
+## 简历亮点
+
+- 设计确定性电商经营数据集，覆盖订单、流量、广告、库存、评价和竞品数据。
+- 实现多工具调用 Agent，返回意图识别、工具轨迹、数据证据、结论和建议动作。
+- 实现 GMV、转化率、客单价、广告 ROI、库存风险和差评率等指标分析。
+- 通过建议审批中心模拟企业级风控闭环，高风险动作只生成待审批任务。
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|------|
-| **后端** | Python 3.12 + FastAPI (async) |
-| **数据库** | PostgreSQL 16 + pgvector |
-| **LLM** | DashScope（通义千问）/ DeepSeek / OpenAI |
-| **嵌入** | BGE-M3 / text-embedding-v3 |
-| **前端** | Vue 3 + Element Plus + Pinia |
-| **队列** | Celery + RabbitMQ |
-| **存储** | MinIO (S3 兼容对象存储) |
-| **部署** | Docker Compose |
+| 后端 | Python 3.12+、FastAPI、Pydantic |
+| Agent | 规则工具编排 + 可选 LangChain/LLM 增强 |
+| 数据 | 本地模拟 CSV/JSON 数据集，保留 PostgreSQL/pgvector 底座 |
+| 前端 | Vue 3、TypeScript、Element Plus、Pinia |
+| 部署 | Docker Compose、Nginx |
+| 测试 | pytest、vue-tsc、Vite build |
+
+## 核心模块
+
+- 运营驾驶舱：展示 GMV、订单数、转化率、客单价、广告 ROI、库存风险和异常提醒。
+- 运营 Agent：根据经营问题调用指标、异常、商品分层、广告 ROI、库存风险等工具，输出可解释分析。
+- 商品分析：展示商品分层、销售贡献、转化效率、毛利、库存和评价风险。
+- 活动策略：根据商品分层生成主推款、利润款、清仓款和活动打法。
+- 建议审批：对改价、加预算、发券、清仓等高风险建议进行审批闭环。
+- 运营知识库：复用原 RAG 能力，用于商品资料、品牌规则、活动复盘和客服 SOP。
 
 ## 快速启动
-
-### 前置条件
-
-- Docker & Docker Compose
-- 通义千问 API Key（[注册获取](https://help.aliyun.com/zh/dashscope/)）
-
-### 1. 配置环境变量
-
-```bash
-cp .env.example .env
-# 编辑 .env 填入 DASHSCOPE_API_KEY 等配置
-```
-
-### 2. 启动所有服务
-
-```bash
-docker-compose up -d
-```
-
-### 3. 访问系统
-
-- 前端页面：`http://localhost`
-- API 文档：`http://localhost/api/docs`
-- 后端：`http://localhost:8000`
-- 管理后台：`http://localhost/admin`
-
-### 4. 默认账号
-
-| 角色 | 用户名 | 密码 |
-|------|-------|------|
-| 管理员 | admin | 123456 |
-| 普通用户 | 注册获取 | - |
-
-## 本地开发（不依赖 Docker）
 
 ### 后端
 
 ```bash
-# 安装依赖
 cd backend
 pip install -r requirements.txt
-
-# 确保 PostgreSQL 已安装并启用 pgvector
-# 执行 scripts/init_db.sql 初始化数据库
-
-# 启动
 uvicorn main:app --reload --port 8000
 ```
 
@@ -73,51 +47,14 @@ npm install
 npm run dev
 ```
 
-## 项目结构
+## 演示路径
 
-```
-.
-├── docker-compose.yml       # 一键部署
-├── backend/                 # FastAPI 后端
-│   ├── main.py              # 主入口 + 路由注册
-│   ├── config.py            # 配置中心
-│   ├── api/                 # API 路由层
-│   ├── core/                # RAG 核心逻辑
-│   ├── services/            # 外部服务封装（LLM/Embedding/解析）
-│   ├── db/                  # 数据层（模型/会话）
-│   ├── schemas/             # Pydantic 模型
-│   ├── tasks/               # Celery 后台任务
-│   └── utils/               # 工具函数
-├── frontend/                # Vue3 前端
-├── nginx/                   # Nginx 反向代理配置
-└── scripts/                 # 初始化 SQL 脚本
-```
+1. 登录系统后进入 `/dashboard` 查看运营驾驶舱。
+2. 进入 `/agent`，提问“昨天 GMV 为什么下降？”。
+3. 查看 Agent 的意图识别、工具调用轨迹、数据证据和建议动作。
+4. 进入 `/recommendations`，审批一条高风险建议。
+5. 进入 `/products` 和 `/campaigns` 展示商品分层与活动策略。
 
-## API 概览
+## 默认定位
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/login` | 用户登录 |
-| POST | `/api/register` | 用户注册 |
-| GET | `/api/verify` | Token 验证 |
-| POST | `/api/chat/send` | 发送消息（SSE 流式） |
-| GET | `/api/chat/conversations` | 会话列表 |
-| POST | `/api/documents/upload` | 上传文档 |
-| GET | `/api/documents/list` | 文档列表 |
-| GET | `/api/health` | 健康检查 |
-
-## 许可
-
-MIT
-## LangChain 集成
-
-系统采用渐进式 LangChain 架构：
-
-- backend/langchain_app/retriever.py：将现有权限过滤和混合检索包装为 BaseRetriever
-- backend/langchain_app/prompts.py：使用 ChatPromptTemplate 和 MessagesPlaceholder
-- backend/langchain_app/models.py：使用 ChatOpenAI 接入 DeepSeek，并通过 Runnable fallback 切换 Qwen
-- backend/langchain_app/chains.py：通过 Runnable Sequence 和 astream() 输出流式回答
-- 图片和图表继续通过现有 Qwen-VL 多模态网关处理
-- PostgreSQL 权限 SQL、SSE 协议、数据库模型和前端保持兼容
-
-Docker 使用 backend/wheels 中的 Linux wheels 离线安装 LangChain，避免容器网络不可用导致构建失败。
+本项目不依赖真实淘宝、天猫、抖店、京东或 Shopify API。第一版使用本地确定性模拟数据，保证没有真实平台、没有内部系统资料、没有大模型 API Key 时也能完整演示；配置大模型后只增强自然语言表达，不改变底层指标计算结果。

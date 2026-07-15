@@ -131,3 +131,13 @@ export const operationsAPI = {
   health: () => client.get("/health"),
   ssoConfig: () => client.get("/sso/config"),
 }
+
+export const ecommerceAPI = {
+  dashboard: () => client.get("/ecommerce/dashboard"),
+  products: () => client.get("/ecommerce/products"),
+  analyze: (question: string) => client.post("/ecommerce/agent/analyze", { question }),
+  campaignPlan: (goal = "大促增长") => client.get("/ecommerce/campaigns/plan", { params: { goal } }),
+  recommendations: (status = "") => client.get("/ecommerce/recommendations", { params: { status } }),
+  approveRecommendation: (id: string) => client.post(`/ecommerce/recommendations/${id}/approve`),
+  rejectRecommendation: (id: string) => client.post(`/ecommerce/recommendations/${id}/reject`),
+}
