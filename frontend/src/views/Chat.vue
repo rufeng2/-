@@ -1,9 +1,9 @@
 <template>
   <div class="chat-layout">
     <!-- 侧边栏 -->
-    <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+    <aside class="sidebar conversation-rail">
       <div class="sidebar-header">
-        <h3>📚 知识库</h3>
+        <h3><el-icon><Collection /></el-icon>会话</h3>
         <el-button text @click="newConversation">
           <el-icon><Plus /></el-icon>
           新对话
@@ -32,19 +32,20 @@
         </div>
       </div>
 
-      <div class="sidebar-footer">
-        <span>{{ authStore.username }}</span>
-        <el-button text @click="logout">退出</el-button>
-      </div>
-    </div>
+    </aside>
 
     <!-- 主聊天区 -->
     <div class="chat-main">
       <div class="messages" ref="messagesRef">
         <div v-if="messages.length === 0" class="empty-state">
-          <div class="empty-icon">📚</div>
+          <div class="empty-icon"><el-icon><ChatDotRound /></el-icon></div>
           <h3>企业知识库智能问答</h3>
-          <p>上传文档后，我可以帮你回答关于企业制度、流程、产品的问题</p>
+          <p>从制度、流程或业务资料中获取有依据的回答</p>
+          <div class="suggested-questions">
+            <button v-for="question in suggestedQuestions" :key="question" type="button" @click="useSuggestion(question)">
+              <el-icon><Right /></el-icon><span>{{ question }}</span>
+            </button>
+          </div>
         </div>
 
         <div
@@ -53,14 +54,14 @@
           class="message"
           :class="msg.role"
         >
-          <div class="avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
+          <div class="avatar message-avatar"><el-icon><UserFilled v-if="msg.role === 'user'" /><ChatDotRound v-else /></el-icon></div>
           <div class="bubble">
             <div v-if="msg.images?.length" class="message-images">
               <img v-for="image in msg.images" :key="image.id" :src="image.url" :alt="image.name" />
             </div>
             <div class="content markdown-body" v-html="renderMarkdown(msg.content)"></div>
             <div v-if="msg.references && msg.references.length" class="references">
-              <div class="ref-title">📎 参考来源</div>
+              <div class="ref-title"><el-icon><Link /></el-icon>参考来源</div>
               <button v-for="(ref, i) in msg.references" :key="i" class="ref-item" @click="openReference(ref)">
                 <span class="ref-badge">{{ i + 1 }}</span>
                 <img v-if="ref.preview_url" :src="ref.preview_url" class="ref-preview" alt="引用图片预览" />
@@ -92,7 +93,7 @@
 
         <!-- 加载中 -->
         <div v-if="loading" class="message assistant">
-          <div class="avatar">🤖</div>
+          <div class="avatar message-avatar"><el-icon><ChatDotRound /></el-icon></div>
           <div class="bubble">
             <div class="typing-indicator">
               <span></span><span></span><span></span>
@@ -135,16 +136,14 @@
           @keydown.enter.prevent="sendMessage"
           :disabled="loading"
         />
-        <el-button
-          v-if="!loading"
-          type="primary"
-          @click="sendMessage"
-          class="send-btn"
-        >
-          <el-icon><Promotion /></el-icon>
-          发送
-        </el-button>
-        <el-button v-else type="danger" plain class="send-btn" @click="stopGeneration">停止</el-button>
+        <el-tooltip v-if="!loading" content="发送问题" placement="top">
+          <el-button type="primary" circle title="发送问题" @click="sendMessage" class="send-btn">
+            <el-icon><Promotion /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-tooltip v-else content="停止生成" placement="top">
+          <el-button type="danger" plain circle title="停止生成" class="send-btn" @click="stopGeneration"><el-icon><VideoPause /></el-icon></el-button>
+        </el-tooltip>
       </div>
     </div>
   </div>
@@ -167,17 +166,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from "vue"
-import { useRouter } from "vue-router"
 import { ElMessage, ElMessageBox } from "element-plus"
-import { Plus, Delete, Promotion, Search, Picture, CopyDocument, RefreshRight } from "@element-plus/icons-vue"
+import { ChatDotRound, Collection, CopyDocument, Delete, Link, Picture, Plus, Promotion, RefreshRight, Right, Search, UserFilled, VideoPause } from "@element-plus/icons-vue"
 import { marked } from "marked"
-import { useAuthStore } from "@/store/auth"
 import { chatAPI, documentAPI, knowledgeBaseAPI } from "@/api/client"
 
-const router = useRouter()
-const authStore = useAuthStore()
-
-const sidebarCollapsed = ref(false)
 const messages = ref<any[]>([])
 const conversations = ref<any[]>([])
 const currentConvId = ref("")
@@ -192,6 +185,11 @@ const debugQuery = ref("")
 const debugRewrittenQuery = ref("")
 const pendingImages = ref<any[]>([])
 const abortController = ref<AbortController | null>(null)
+const suggestedQuestions = ["报销流程需要哪些材料？", "客户服务响应时限是什么？", "帮我查找信息安全制度原文"]
+
+function useSuggestion(question: string) {
+  inputText.value = question
+}
 
 onMounted(() => {
   loadConversations()
@@ -452,10 +450,6 @@ function scrollToBottom() {
   })
 }
 
-function logout() {
-  authStore.logout()
-  router.push("/")
-}
 </script>
 
 <style scoped>
@@ -530,16 +524,6 @@ function logout() {
 
 .conv-item:hover .conv-delete {
   opacity: 1;
-}
-
-.sidebar-footer {
-  padding: 12px 16px;
-  border-top: 1px solid #e4e7ed;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  color: #606266;
 }
 
 /* 主聊天区 */
@@ -731,5 +715,70 @@ function logout() {
   .pending-images { padding: 8px 12px 0; overflow-x: auto; }
   .input-area { padding: 12px; }
   .send-btn { width: 64px; }
+}
+</style>
+
+<style scoped>
+.chat-layout { height: 100%; min-height: 0; background: var(--surface); }
+.conversation-rail { width: 238px; min-width: 238px; background: #f7f9f8; border-right: 1px solid var(--border); }
+.sidebar-header { min-height: 64px; padding: 12px 13px; border-bottom-color: var(--border); }
+.sidebar-header h3 { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--ink); font-size: 14px; }
+.sidebar-header .el-button { min-width: 36px; padding: 0 8px; }
+.conversation-list { padding: 9px 8px 16px; }
+.conv-item { min-height: 54px; margin-bottom: 3px; padding: 9px 34px 8px 11px; border: 1px solid transparent; border-radius: var(--radius); }
+.conv-item:hover { background: #eef2f0; }
+.conv-item.active { background: var(--surface); border-color: var(--border-strong); box-shadow: 0 1px 2px rgba(20, 34, 28, .04); }
+.conv-title { padding: 0; color: #2a3530; font-size: 13px; font-weight: 530; }
+.conv-time { margin-top: 3px; color: #89938e; font-size: 11px; }
+.conv-delete { top: 9px; right: 6px; width: 28px; min-width: 28px; height: 28px; transform: none; }
+.chat-main { min-width: 0; background: var(--surface); }
+.messages { padding: 30px max(28px, calc((100% - 900px) / 2)); background: var(--surface); scroll-padding-bottom: 140px; }
+.empty-state { max-width: 760px; height: 100%; min-height: 420px; margin: 0 auto; color: var(--ink-muted); text-align: center; }
+.empty-icon { display: grid; width: 52px; height: 52px; margin: 0 0 18px; place-items: center; color: var(--success); background: #e7f3ed; border: 1px solid #cce5d9; border-radius: 50%; font-size: 25px; }
+.empty-state h3 { margin: 0; color: var(--ink); font-size: 20px; font-weight: 660; }
+.empty-state p { margin: 8px 0 24px; font-size: 13px; }
+.suggested-questions { display: grid; width: min(620px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.suggested-questions button { display: flex; min-height: 62px; align-items: flex-start; gap: 7px; padding: 12px; color: #38433e; background: #fafcfb; border: 1px solid var(--border); border-radius: var(--radius); text-align: left; cursor: pointer; line-height: 1.5; }
+.suggested-questions button:hover { background: #f2f6f4; border-color: var(--border-strong); }
+.suggested-questions .el-icon { flex: 0 0 auto; margin-top: 3px; color: var(--primary); }
+.message { width: min(900px, 100%); margin: 0 auto 28px; gap: 11px; }
+.message.user { align-items: flex-start; }
+.message-avatar { width: 32px; height: 32px; flex: 0 0 32px; color: #2e6a50; background: #e3f0e9; font-size: 16px; }
+.message.user .message-avatar { color: #315999; background: #e8eef9; }
+.bubble { width: min(760px, calc(100% - 44px)); max-width: none; padding: 0; border-radius: 0; }
+.assistant .bubble { background: transparent; border: 0; }
+.user .bubble { width: auto; max-width: 72%; padding: 10px 13px; color: #1d2b25; background: #eef3ff; border: 1px solid #d8e2f5; border-radius: 7px 7px 2px 7px; }
+.content { color: #25302b; font-size: 14px; }
+.references { margin-top: 16px; padding-top: 13px; border-top-color: var(--border); }
+.ref-title { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #64706a; font-weight: 600; }
+.ref-item { display: grid; width: 100%; grid-template-columns: 24px auto minmax(0, 1fr); align-items: center; gap: 9px; margin-bottom: 5px; padding: 8px 9px; color: #33443d; background: #fafcfb; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; }
+.ref-item:hover { background: #f3f7f5; border-color: var(--border-strong); text-decoration: none; }
+.ref-badge { display: grid; width: 22px; height: 22px; margin: 0; place-items: center; color: var(--primary); background: #eaf0ff; border-radius: 4px; }
+.ref-preview { border-radius: 4px; }
+.msg-actions { align-items: center; gap: 2px; margin-top: 10px; opacity: .76; }
+.msg-actions:hover { opacity: 1; }
+.msg-actions .el-button + .el-button { margin-left: 0; }
+.typing-indicator { padding: 9px 0; }
+.typing-indicator span { width: 6px; height: 6px; background: #74817b; }
+.chat-tools { padding: 10px max(28px, calc((100% - 900px) / 2)) 0; border-top: 1px solid var(--border); gap: 8px; }
+.chat-tools .el-select { width: 260px; }
+.pending-images { padding: 8px max(28px, calc((100% - 900px) / 2)) 0; }
+.pending-image { border-color: var(--border); border-radius: var(--radius); }
+.input-area { padding: 10px max(28px, calc((100% - 900px) / 2)) 18px; border-top: 0; gap: 9px; }
+.input-area :deep(.el-textarea__inner) { min-height: 62px !important; padding: 11px 13px; resize: none; }
+.send-btn { width: 44px; min-width: 44px; height: 44px; padding: 0; align-self: center; }
+
+@media(max-width:760px) {
+  .chat-layout { height: calc(100vh - 52px); min-height: 0; }
+  .conversation-rail { display: none; }
+  .messages { padding: 22px 13px; }
+  .empty-state { min-height: 360px; }
+  .suggested-questions { grid-template-columns: 1fr; }
+  .suggested-questions button { min-height: 48px; }
+  .bubble, .user .bubble { max-width: calc(100% - 40px); }
+  .chat-tools { padding: 8px 12px 0; }
+  .chat-tools .el-select { width: 100%; }
+  .pending-images { padding: 8px 12px 0; overflow-x: auto; }
+  .input-area { padding: 9px 12px 12px; }
 }
 </style>
