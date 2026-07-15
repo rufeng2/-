@@ -9,15 +9,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Python 依赖
-COPY requirements.txt .
-RUN pip install --default-timeout=300 -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+COPY backend/requirements.txt ./backend-requirements.txt
+RUN pip install --default-timeout=300 -i https://pypi.tuna.tsinghua.edu.cn/simple -r backend-requirements.txt
 
-COPY requirements-langchain.txt .
-COPY wheels /wheels
+COPY backend/requirements-langchain.txt ./requirements-langchain.txt
+COPY backend/wheels /wheels
 RUN pip install --no-index --find-links=/wheels -r requirements-langchain.txt
 
 # 复制源码（开发模式通过 volume 挂载）
-COPY . ./backend
+COPY backend ./backend
+COPY alembic.ini ./alembic.ini
+
+RUN addgroup --system app && adduser --system --ingroup app app \
+    && chown -R app:app /app
+
+USER app
 
 EXPOSE 8000
 

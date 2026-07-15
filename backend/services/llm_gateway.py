@@ -12,13 +12,19 @@ from openai import AsyncOpenAI
 
 from backend.config import settings
 from backend.utils.logger import logger
+from backend.services.circuit_breaker import AsyncCircuitBreaker
+
+
+class ProviderUnavailableError(RuntimeError):
+    pass
 
 
 class LLMGateway:
     """大模型调用网关"""
 
     def __init__(self):
-        self.timeout = httpx.Timeout(120.0, connect=10.0)
+        self.timeout = httpx.Timeout(settings.PROVIDER_TIMEOUT_SECONDS, connect=min(10.0, settings.PROVIDER_TIMEOUT_SECONDS))
+        self.breaker = AsyncCircuitBreaker(settings.PROVIDER_CIRCUIT_FAILURES, settings.PROVIDER_CIRCUIT_RECOVERY_SECONDS)
         self._deepseek_client: Optional[AsyncOpenAI] = None
         self._dashscope_client: Optional[AsyncOpenAI] = None
 
@@ -85,13 +91,10 @@ class LLMGateway:
         tried_deepseek = "deepseek" in str(client.base_url).lower()
 
         try:
-            stream = await client.chat.completions.create(
-                model=actual_model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-            )
+            stream = await self.breaker.call(lambda: client.chat.completions.create(
+                model=actual_model, messages=messages, temperature=temperature,
+                max_tokens=max_tokens, stream=True,
+            ))
 
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
@@ -143,7 +146,7 @@ class LLMGateway:
                     logger.warning("DeepSeek API Key 未配置，无法 failover")
 
             # 所有尝试都失败了
-            yield f"抱歉，AI 服务暂时不可用。请稍后重试。错误: {str(e)[:80]}"
+            raise ProviderUnavailableError("AI_PROVIDER_UNAVAILABLE") from e
 
     # ===================== 非流式调用 ======================
 
@@ -162,17 +165,14 @@ class LLMGateway:
         client, actual_model = self._resolve_client(model)
 
         try:
-            response = await client.chat.completions.create(
-                model=actual_model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=False,
-            )
+            response = await self.breaker.call(lambda: client.chat.completions.create(
+                model=actual_model, messages=messages, temperature=temperature,
+                max_tokens=max_tokens, stream=False,
+            ))
             return response.choices[0].message.content or ""
         except Exception as e:
             logger.error(f"LLM call error: {e}")
-            return ""
+            raise ProviderUnavailableError("AI_PROVIDER_UNAVAILABLE") from e
 
     # ===================== 多模态 Vision（看图）======================
 
@@ -219,7 +219,7 @@ class LLMGateway:
                     yield chunk.choices[0].delta.content
         except Exception as e:
             logger.error(f"Vision LLM error: {e}")
-            yield f"[图片分析服务暂时不可用: {str(e)[:80]}"
+            raise ProviderUnavailableError("AI_PROVIDER_UNAVAILABLE") from e
 
     async def analyze_image(
         self,

@@ -22,7 +22,7 @@ from backend.services.retrieval_policy import retrieval_policy
 from backend.services.business_intent import business_intent_router
 from backend.services.cache_service import cache_service
 from backend.services.observability import StageTimings
-from backend.services.reflection_service import reflection_service
+from backend.services.reflection_service import reflection_service, requires_buffered_validation
 from backend.services.memory_service import long_term_memory_service
 from backend.security.ai_guardrails import ai_guardrails
 from backend.services.storage_service import storage_service
@@ -557,6 +557,7 @@ class RAGPipeline:
                 cache_status["answer"] = "hit"
                 answer = str(cached_answer["answer"])
                 references = list(cached_answer.get("references") or [])
+                timings.record_ttft("answer_cache")
                 for token in self._answer_chunks(answer):
                     yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
                 msg_id = await self._save_message(conv_id, "assistant", answer, references, db)
@@ -670,6 +671,8 @@ class RAGPipeline:
         full_answer = ""
         msg_id = ""
         generation_started = time.perf_counter()
+        buffered_validation = requires_buffered_validation(query, results, has_image_docs)
+        answer_streamed = False
 
         try:
             if has_image_docs and image_paths:
@@ -704,19 +707,42 @@ class RAGPipeline:
                     "history": history_to_messages(history),
                     "memory": memory_context,
                 }
-                async for token in chain.astream(chain_input):
-                    if token:
-                        full_answer += token
+                if buffered_validation:
+                    async for token in chain.astream(chain_input):
+                        if token:
+                            full_answer += token
+                else:
+                    pending = ""
+                    safe_parts: list[str] = []
+                    async for token in chain.astream(chain_input):
+                        if not token:
+                            continue
+                        pending += token
+                        if "\n" in pending or len(pending) >= 256:
+                            safe_part = ai_guardrails.sanitize_output(pending).text
+                            safe_parts.append(safe_part)
+                            if not answer_streamed:
+                                timings.record_ttft("generation")
+                                answer_streamed = True
+                            yield f"data: {json.dumps({'token': safe_part}, ensure_ascii=False)}\n\n"
+                            pending = ""
+                    if pending:
+                        safe_part = ai_guardrails.sanitize_output(pending).text
+                        safe_parts.append(safe_part)
+                        if not answer_streamed:
+                            timings.record_ttft("generation")
+                            answer_streamed = True
+                        yield f"data: {json.dumps({'token': safe_part}, ensure_ascii=False)}\n\n"
+                    full_answer = "".join(safe_parts)
 
         except Exception as e:
             logger.error(f"Generation error: {e}", exc_info=True)
-            fallback = f"抱歉，AI 服务暂时不可用。以下是检索到的相关文档：\n\n{context}\n\n如需进一步帮助，请联系技术支持。"
-            full_answer = fallback
+            full_answer = "AI 服务暂时不可用，请稍后重试。错误代码：AI_PROVIDER_UNAVAILABLE。"
         timings.record("generation", time.perf_counter() - generation_started)
 
         # ---- Step 7: 保存助手消息；来源清单由前端根据结构化 references 统一展示 ----
 
-        if settings.REFLECTION_ENABLED:
+        if settings.REFLECTION_ENABLED and buffered_validation and not answer_streamed:
             reflection_payload["attempted"] = True
             with timings.track("reflection"):
                 validation = await reflection_service.validate(query, full_answer, context)
@@ -768,8 +794,10 @@ The previous draft did not pass validation. Produce a corrected answer supported
         with timings.track("output_guard"):
             output_safety = ai_guardrails.sanitize_output(full_answer)
         full_answer = output_safety.text
-        for token in self._answer_chunks(full_answer):
-            yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
+        if not answer_streamed:
+            timings.record_ttft("generation")
+            for token in self._answer_chunks(full_answer):
+                yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
 
         with timings.track("memory_store"):
             memory_stored = await long_term_memory_service.remember_task(

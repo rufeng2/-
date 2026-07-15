@@ -73,8 +73,8 @@ services:
   # ==================== FastAPI 后端 ====================
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-backend
     restart: unless-stopped
     ports:
@@ -95,15 +95,14 @@ services:
       minio:
         condition: service_healthy
     volumes:
-      - ./backend:/app/backend
       - uploaddata:/app/data/uploads
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --log-level info
 
   # ==================== Celery Worker ====================
   celery_worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-celery
     restart: unless-stopped
     env_file:
@@ -122,15 +121,14 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./backend:/app/backend
       - uploaddata:/app/data/uploads
     command: celery -A backend.tasks.celery_app worker -l info --concurrency=2
 
   # ==================== Celery Beat（定时任务） ====================
   celery_beat:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-celery-beat
     restart: unless-stopped
     env_file:
@@ -138,7 +136,6 @@ services:
     depends_on:
       - celery_worker
     volumes:
-      - ./backend:/app/backend
       - uploaddata:/app/data/uploads
     command: celery -A backend.tasks.celery_app beat -l info
 
