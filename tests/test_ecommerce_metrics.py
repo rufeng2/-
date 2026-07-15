@@ -35,6 +35,18 @@ def test_dashboard_computes_core_kpis_and_detects_drop():
     assert any(item.metric == "gmv" for item in dashboard.anomalies)
 
 
+def test_dashboard_explains_gmv_change_with_attribution():
+    dataset = EcommerceDataLoader(Path("data/ecommerce")).load()
+    dashboard = build_dashboard(dataset)
+
+    factors = {item.factor: item for item in dashboard.gmv_attribution}
+
+    assert set(factors) == {"traffic", "conversion", "aov"}
+    assert factors["conversion"].delta_value < 0
+    assert factors["conversion"].contribution_pct < 0
+    assert "转化率" in factors["conversion"].insight
+
+
 def test_product_analysis_labels_inventory_and_review_risks():
     dataset = EcommerceDataLoader(Path("data/ecommerce")).load()
     products = build_product_analysis(dataset)
@@ -43,6 +55,15 @@ def test_product_analysis_labels_inventory_and_review_risks():
     assert by_id["P001"].segment in {"hero", "risk"}
     assert "库存风险" in by_id["P007"].risk_tags
     assert "差评风险" in by_id["P008"].risk_tags
+
+
+def test_product_analysis_adds_abc_and_turnover_indicators():
+    dataset = EcommerceDataLoader(Path("data/ecommerce")).load()
+    products = build_product_analysis(dataset)
+
+    assert {item.abc_segment for item in products} >= {"A", "B", "C"}
+    assert all(item.inventory_turnover_days >= 0 for item in products)
+    assert products[0].abc_segment == "A"
 
 
 def test_anomaly_detection_returns_evidence():

@@ -12,7 +12,13 @@ def test_agent_returns_tool_trace_for_gmv_question():
     result = agent.analyze("昨天 GMV 为什么下降？")
 
     assert result.intent == "business_diagnosis"
-    assert [step.tool_name for step in result.tool_trace] == ["get_kpi_snapshot", "detect_anomalies", "rank_products"]
+    assert [step.tool_name for step in result.tool_trace] == [
+        "get_kpi_snapshot",
+        "explain_gmv_attribution",
+        "detect_anomalies",
+        "rank_products",
+    ]
+    assert all(step.step_title for step in result.tool_trace)
     assert result.evidence
     assert any(action.risk_level == "high" for action in result.recommendations)
     assert result.confidence >= 0.7

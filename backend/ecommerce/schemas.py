@@ -104,11 +104,22 @@ class Anomaly(BaseModel):
     evidence: list[Evidence]
 
 
+class GmvAttribution(BaseModel):
+    factor: str
+    label: str
+    current: float
+    baseline: float
+    delta_value: float
+    contribution_pct: float
+    insight: str
+
+
 class DashboardSummary(BaseModel):
     date: str
     kpis: dict[str, KpiValue]
     anomalies: list[Anomaly]
     trend: list[dict[str, float | str]]
+    gmv_attribution: list[GmvAttribution]
 
 
 class ProductAnalysis(BaseModel):
@@ -116,12 +127,14 @@ class ProductAnalysis(BaseModel):
     name: str
     category: str
     segment: str
+    abc_segment: str
     gmv: float
     orders: int
     conversion_rate: float
     gross_margin_rate: float
     stock: int
     safety_stock: int
+    inventory_turnover_days: float
     ad_roi: float
     average_rating: float
     risk_tags: list[str]
@@ -129,6 +142,7 @@ class ProductAnalysis(BaseModel):
 
 class ToolTraceStep(BaseModel):
     tool_name: str
+    step_title: str = ""
     input: dict[str, str | int | float | bool]
     output_summary: str
 

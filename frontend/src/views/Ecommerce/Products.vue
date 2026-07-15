@@ -3,7 +3,7 @@
     <div class="page-heading">
       <div>
         <h1>商品分析</h1>
-        <p>查看商品分层、GMV 贡献、转化效率、毛利、库存和评价风险。</p>
+        <p>查看商品分层、ABC 分层、GMV 贡献、转化效率、毛利、库存周转和评价风险。</p>
       </div>
       <el-button type="primary" :loading="loading" @click="load">刷新商品</el-button>
     </div>
@@ -15,13 +15,17 @@
         <el-table-column prop="segment" label="商品分层" width="110">
           <template #default="{ row }"><el-tag>{{ row.segment }}</el-tag></template>
         </el-table-column>
+        <el-table-column prop="abc_segment" label="ABC 分层" width="100">
+          <template #default="{ row }"><el-tag type="success">{{ row.abc_segment }}</el-tag></template>
+        </el-table-column>
         <el-table-column prop="gmv" label="GMV" width="110" />
         <el-table-column prop="orders" label="订单" width="90" />
-        <el-table-column prop="conversion_rate" label="转化率%" width="110" />
-        <el-table-column prop="gross_margin_rate" label="毛利率%" width="110" />
+        <el-table-column prop="conversion_rate" label="转化率" width="110" />
+        <el-table-column prop="gross_margin_rate" label="毛利率" width="110" />
         <el-table-column label="库存" width="110">
           <template #default="{ row }">{{ row.stock }}/{{ row.safety_stock }}</template>
         </el-table-column>
+        <el-table-column prop="inventory_turnover_days" label="周转天数" width="110" />
         <el-table-column prop="ad_roi" label="广告 ROI" width="110" />
         <el-table-column prop="average_rating" label="评分" width="90" />
         <el-table-column label="风险标签" min-width="160">

@@ -19,7 +19,14 @@
     <el-row :gutter="16" class="section-row">
       <el-col :xs="24" :lg="14">
         <div class="panel section-panel">
-          <h2>经营趋势</h2>
+          <h2>GMV 趋势图</h2>
+          <div class="trend-chart">
+            <div v-for="row in dashboard?.trend || []" :key="row.date" class="trend-bar">
+              <span>{{ row.date.slice(5) }}</span>
+              <div><i :style="{ height: trendHeight(row.gmv) + '%' }"></i></div>
+              <b>{{ row.gmv }}</b>
+            </div>
+          </div>
           <el-table :data="dashboard?.trend || []">
             <el-table-column prop="date" label="日期" />
             <el-table-column prop="gmv" label="GMV" />
@@ -39,16 +46,40 @@
         </div>
       </el-col>
     </el-row>
+
+    <div class="panel section-panel attribution-panel">
+      <h2>GMV 归因</h2>
+      <div class="attribution-grid">
+        <article v-for="item in dashboard?.gmv_attribution || []" :key="item.factor" class="attribution-item">
+          <div>
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.insight }}</span>
+          </div>
+          <b :class="{ negative: item.delta_value < 0, positive: item.delta_value > 0 }">{{ item.delta_value }} 元</b>
+          <div class="impact-track"><i :class="{ negative: item.delta_value < 0, positive: item.delta_value > 0 }" :style="{ width: impactWidth(item.contribution_pct) + '%' }"></i></div>
+          <small>贡献度 {{ item.contribution_pct }}%</small>
+        </article>
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { ElMessage } from "element-plus"
 import { ecommerceAPI } from "@/api/client"
 
 const loading = ref(false)
 const dashboard = ref<any>(null)
+const maxGmv = computed(() => Math.max(...(dashboard.value?.trend || []).map((row: any) => Number(row.gmv)), 1))
+
+function trendHeight(value: number) {
+  return Math.max(12, Math.round(Number(value) / maxGmv.value * 100))
+}
+
+function impactWidth(value: number) {
+  return Math.min(100, Math.max(8, Math.abs(Number(value))))
+}
 
 async function load() {
   loading.value = true
@@ -65,5 +96,5 @@ onMounted(load)
 </script>
 
 <style scoped>
-.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.metric-card{background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px}.metric-card span{display:block;color:var(--ink-muted);font-size:12px}.metric-card strong{display:block;margin-top:8px;font-size:24px}.metric-card em{font-style:normal;font-size:12px}.metric-card em.down{color:var(--danger)}.metric-card em.up{color:var(--success)}.section-row{margin-top:16px}.section-panel{padding:16px}.section-panel h2{margin:0 0 12px;font-size:16px}.alert-item{border-top:1px solid var(--border);padding:12px 0}.alert-item:first-of-type{border-top:0}.alert-item strong{display:block;margin:6px 0}.alert-item p{margin:0;color:var(--ink-muted);line-height:1.6}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.metric-card{background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px}.metric-card span{display:block;color:var(--ink-muted);font-size:12px}.metric-card strong{display:block;margin-top:8px;font-size:24px}.metric-card em{font-style:normal;font-size:12px}.metric-card em.down,.negative{color:var(--danger)}.metric-card em.up,.positive{color:var(--success)}.section-row{margin-top:16px}.section-panel{padding:16px}.section-panel h2{margin:0 0 12px;font-size:16px}.trend-chart{display:flex;align-items:end;gap:12px;height:170px;margin-bottom:14px;padding:12px;border:1px solid var(--border);border-radius:6px;background:#f8fafc}.trend-bar{display:grid;grid-template-rows:1fr auto auto;gap:6px;align-items:end;min-width:62px;text-align:center}.trend-bar div{display:flex;align-items:end;justify-content:center;height:104px}.trend-bar i{display:block;width:28px;border-radius:4px 4px 0 0;background:#2563eb}.trend-bar span,.trend-bar b{font-size:12px;color:var(--ink-muted)}.alert-item{border-top:1px solid var(--border);padding:12px 0}.alert-item:first-of-type{border-top:0}.alert-item strong{display:block;margin:6px 0}.alert-item p{margin:0;color:var(--ink-muted);line-height:1.6}.attribution-panel{margin-top:16px}.attribution-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.attribution-item{border:1px solid var(--border);border-radius:6px;padding:14px;background:#fff}.attribution-item strong,.attribution-item b,.attribution-item span,.attribution-item small{display:block}.attribution-item span{margin-top:4px;color:var(--ink-muted);font-size:12px;line-height:1.5}.attribution-item b{margin-top:12px;font-size:20px}.impact-track{height:6px;margin:8px 0;background:#eef2f6;border-radius:999px;overflow:hidden}.impact-track i{display:block;height:100%;background:var(--success)}.impact-track i.negative{background:var(--danger)}.attribution-item small{margin-top:4px;color:var(--ink-muted)}
 </style>

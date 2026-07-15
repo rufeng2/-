@@ -12,6 +12,7 @@ def build_product_analysis(dataset: EcommerceDataset) -> list[ProductAnalysis]:
     inventory = {row.product_id: row for row in dataset.inventory}
     ad_roi = _ad_roi_by_product(dataset, current_day)
     ratings = _rating_by_product(dataset, current_day)
+    abc = _abc_segments(orders)
     results: list[ProductAnalysis] = []
 
     for product_id, product in products.items():
@@ -20,6 +21,7 @@ def build_product_analysis(dataset: EcommerceDataset) -> list[ProductAnalysis]:
         inv = inventory[product_id]
         gmv = order.gmv if order else 0
         order_count = order.orders if order else 0
+        units = order.units if order else 0
         conversion = safe_div(order_count, visit.visitors if visit else 0) * 100
         margin = safe_div(product.price - product.cost, product.price) * 100
         average_rating = ratings.get(product_id, 5.0)
@@ -41,23 +43,47 @@ def build_product_analysis(dataset: EcommerceDataset) -> list[ProductAnalysis]:
         elif conversion >= 5:
             segment = "traffic"
 
+        inventory_turnover_days = safe_div(inv.stock, units)
+
         results.append(ProductAnalysis(
             product_id=product_id,
             name=product.name,
             category=product.category,
             segment=segment,
+            abc_segment=abc.get(product_id, "C"),
             gmv=round(gmv, 2),
             orders=order_count,
             conversion_rate=round(conversion, 2),
             gross_margin_rate=round(margin, 2),
             stock=inv.stock,
             safety_stock=inv.safety_stock,
+            inventory_turnover_days=round(inventory_turnover_days, 1),
             ad_roi=round(ad_roi.get(product_id, 0), 2),
             average_rating=round(average_rating, 2),
             risk_tags=risk_tags,
         ))
 
     return sorted(results, key=lambda item: item.gmv, reverse=True)
+
+
+def _abc_segments(orders: dict) -> dict[str, str]:
+    total_gmv = sum(row.gmv for row in orders.values())
+    if total_gmv <= 0:
+        return {product_id: "C" for product_id in orders}
+
+    cumulative = 0.0
+    segments: dict[str, str] = {}
+    for product_id, row in sorted(orders.items(), key=lambda item: item[1].gmv, reverse=True):
+        cumulative += row.gmv
+        share = cumulative / total_gmv
+        if share <= 0.7:
+            segment = "A"
+        elif share <= 0.9:
+            segment = "B"
+        else:
+            segment = "C"
+        segments[product_id] = segment
+    return segments
 
 
 def _ad_roi_by_product(dataset: EcommerceDataset, target_day):

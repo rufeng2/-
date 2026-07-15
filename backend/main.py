@@ -49,7 +49,6 @@ async def apply_production_middleware(request, call_next):
     return await production_middleware(request, call_next)
 
 
-# Routers
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(chat.router)

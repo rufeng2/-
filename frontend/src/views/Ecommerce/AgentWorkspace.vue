@@ -25,12 +25,18 @@
           <el-descriptions-item label="置信度">{{ analysis.confidence }}</el-descriptions-item>
         </el-descriptions>
 
-        <h3>工具调用轨迹</h3>
-        <el-timeline>
-          <el-timeline-item v-for="step in analysis.tool_trace" :key="step.tool_name" :timestamp="step.tool_name">
-            {{ step.output_summary }}
-          </el-timeline-item>
-        </el-timeline>
+        <h3>Agent 执行轨迹</h3>
+        <div class="trace-list">
+          <article v-for="(step, index) in analysis.tool_trace" :key="step.tool_name" class="trace-step">
+            <span>{{ index + 1 }}</span>
+            <div>
+              <strong>{{ step.step_title || step.tool_name }}</strong>
+              <small>{{ step.tool_name }}</small>
+              <p>{{ step.output_summary }}</p>
+              <code>{{ JSON.stringify(step.input) }}</code>
+            </div>
+          </article>
+        </div>
 
         <h3>数据证据</h3>
         <el-table :data="analysis.evidence">
@@ -75,5 +81,5 @@ async function analyze() {
 </script>
 
 <style scoped>
-.agent-layout{padding:18px}.question-bar{display:grid;grid-template-columns:1fr auto;gap:10px}.quick-prompts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}.agent-layout h2{font-size:18px;line-height:1.5}.agent-layout h3{margin:22px 0 10px;font-size:15px}
+.agent-layout{padding:18px}.question-bar{display:grid;grid-template-columns:1fr auto;gap:10px}.quick-prompts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}.agent-layout h2{font-size:18px;line-height:1.5}.agent-layout h3{margin:22px 0 10px;font-size:15px}.trace-list{display:grid;gap:10px}.trace-step{display:grid;grid-template-columns:32px 1fr;gap:12px;border:1px solid var(--border);border-radius:6px;padding:12px;background:#fff}.trace-step>span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-weight:700}.trace-step strong,.trace-step small,.trace-step code{display:block}.trace-step small{margin-top:2px;color:var(--ink-muted)}.trace-step p{margin:8px 0;color:var(--ink);line-height:1.5}.trace-step code{white-space:normal;word-break:break-word;color:var(--ink-muted);font-size:12px}
 </style>

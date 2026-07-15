@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MOJIBAKE_MARKERS = ("鏅", "鐢", "鍟", "杩", "寤", "鏁", "椋", "�", "乂", "丒")
 
 
 def read(path: str) -> str:
@@ -29,6 +30,7 @@ def test_frontend_api_exports_ecommerce_client():
     assert "export const ecommerceAPI" in client
     assert 'client.get("/ecommerce/dashboard")' in client
     assert 'client.post("/ecommerce/agent/analyze"' in client
+    assert 'campaignPlan: (goal = "大促增长")' in client
 
 
 def test_ecommerce_pages_render_agent_and_analysis_terms():
@@ -42,7 +44,38 @@ def test_ecommerce_pages_render_agent_and_analysis_terms():
     content = "\n".join(read(path) for path in pages)
 
     assert "GMV" in content
-    assert "工具调用轨迹" in content
+    assert "GMV 趋势图" in content
+    assert "GMV 归因" in content
+    assert "Agent 执行轨迹" in content
     assert "数据证据" in content
     assert "商品分层" in content
+    assert "ABC 分层" in content
     assert "建议审批" in content
+
+
+def test_public_copy_has_no_mojibake_markers():
+    files = [
+        "README.md",
+        "frontend/src/App.vue",
+        "frontend/src/views/Login.vue",
+        "frontend/src/views/Ecommerce/Dashboard.vue",
+        "frontend/src/views/Ecommerce/AgentWorkspace.vue",
+        "frontend/src/views/Ecommerce/Products.vue",
+        "frontend/src/views/Ecommerce/Campaigns.vue",
+        "frontend/src/views/Ecommerce/Recommendations.vue",
+        "backend/main.py",
+        "backend/api/ecommerce.py",
+        "backend/ecommerce/agent.py",
+        "backend/ecommerce/anomaly.py",
+        "backend/ecommerce/metrics.py",
+        "backend/ecommerce/segmentation.py",
+        "backend/ecommerce/tools.py",
+    ]
+
+    offenders = {
+        path: [marker for marker in MOJIBAKE_MARKERS if marker in read(path)]
+        for path in files
+    }
+    offenders = {path: markers for path, markers in offenders.items() if markers}
+
+    assert offenders == {}

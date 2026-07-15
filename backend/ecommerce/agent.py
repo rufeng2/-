@@ -28,9 +28,19 @@ class EcommerceAgent:
 
     def _business_diagnosis(self, question: str) -> AgentAnalysis:
         dashboard, kpi_trace = self.tools.get_kpi_snapshot()
+        attribution, attribution_trace = self.tools.explain_gmv_attribution()
         anomalies, anomaly_trace = self.tools.detect_anomalies()
         _products, product_trace = self.tools.rank_products()
         evidence = [item for anomaly in anomalies for item in anomaly.evidence][:6]
+        evidence.extend([
+            Evidence(
+                label=item.label,
+                value=f"{item.delta_value} 元",
+                baseline=f"贡献度 {item.contribution_pct}%",
+                rule=item.insight,
+            )
+            for item in attribution
+        ])
         recommendations = [
             RecommendedAction.create(
                 title="暂停低 ROI 广告计划并复盘素材",
@@ -38,26 +48,29 @@ class EcommerceAgent:
                 risk_level="high",
                 reason="广告 ROI 异常低于投放阈值，继续消耗会放大损耗。",
                 expected_impact="减少低效花费，优先保住整体 ROI。",
-                evidence=evidence[:2],
+                evidence=evidence[:3],
             ),
             RecommendedAction.create(
                 title="优化主推商品详情页和评价解释",
                 action_type="content_optimization",
                 risk_level="low",
-                reason="主推商品流量稳定但成交下降，评价和尺码问题影响转化。",
+                reason="主推商品流量稳定但成交下滑，评价和尺码问题影响转化。",
                 expected_impact="提升详情页承接和客服解释效率。",
-                evidence=evidence[:3],
+                evidence=evidence[:4],
             ),
         ]
         return AgentAnalysis(
             question=question,
             intent="business_diagnosis",
-            summary=f"GMV 下降主要由主推商品转化走弱、低 ROI 广告消耗和部分商品库存/评价风险共同造成。当前 GMV 为 {dashboard.kpis['gmv'].value} 元，环比 {dashboard.kpis['gmv'].delta_pct}%。",
-            tool_trace=[kpi_trace, anomaly_trace, product_trace],
+            summary=(
+                f"GMV 下滑主要由转化率走弱、低 ROI 广告消耗和部分商品库存/评价风险共同造成。"
+                f"当前 GMV 为 {dashboard.kpis['gmv'].value} 元，环比 {dashboard.kpis['gmv'].delta_pct}%。"
+            ),
+            tool_trace=[kpi_trace, attribution_trace, anomaly_trace, product_trace],
             evidence=evidence,
             recommendations=recommendations,
             risk_level="high",
-            confidence=0.86,
+            confidence=0.88,
         )
 
     def _campaign(self, question: str) -> AgentAnalysis:
@@ -65,7 +78,7 @@ class EcommerceAgent:
         products, product_trace = self.tools.rank_products()
         evidence = [
             Evidence(label="主推商品数", value=str(len(plan["hero_products"])), rule="segment in hero/profit"),
-            Evidence(label="商品分层样本", value=str(len(products)), rule="gmv + margin + risk tags"),
+            Evidence(label="商品分层样本", value=str(len(products)), rule="gmv + margin + risk tags + ABC"),
         ]
         return AgentAnalysis(
             question=question,
