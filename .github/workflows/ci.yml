@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r backend/requirements.txt -r requirements-dev.txt pip-audit
+      - run: pip install -r backend/requirements.txt -r backend/requirements-langchain.txt -r requirements-dev.txt pip-audit
       - run: python -m compileall backend
       - run: pytest tests -q
       - run: pip-audit
@@ -32,6 +32,8 @@ jobs:
       - run: npm run build
   compose:
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: knowledge-rag
     steps:
       - uses: actions/checkout@v4
       - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config
