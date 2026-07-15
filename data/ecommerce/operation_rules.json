@@ -1,0 +1,19 @@
+{
+  "thresholds": {
+    "low_roi": 1.8,
+    "critical_stock_ratio": 1.0,
+    "warning_stock_ratio": 1.4,
+    "conversion_drop_pct": -20,
+    "gmv_drop_pct": -15,
+    "bad_rating": 4.0
+  },
+  "risk_actions": {
+    "price_change": "high",
+    "ad_budget_increase": "high",
+    "coupon": "high",
+    "clearance": "high",
+    "content_optimization": "low",
+    "customer_service_followup": "low",
+    "campaign_plan": "medium"
+  }
+}
