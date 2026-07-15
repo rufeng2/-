@@ -31,7 +31,7 @@ def test_ci_installs_runtime_dependencies_and_scans():
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "backend/requirements.txt" in workflow
     assert "backend/requirements-langchain.txt" in workflow
-    assert "COMPOSE_PROJECT_NAME: knowledge-rag" in workflow
+    assert "COMPOSE_PROJECT_NAME: ecommerce-agent" in workflow
     assert "cp .env.example .env" in workflow
     assert "pip-audit" in workflow
     assert "gitleaks" in workflow

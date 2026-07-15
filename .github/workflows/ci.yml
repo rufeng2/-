@@ -40,9 +40,9 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     env:
-      COMPOSE_PROJECT_NAME: knowledge-rag
+      COMPOSE_PROJECT_NAME: ecommerce-agent
     steps:
       - uses: actions/checkout@v4
       - run: cp .env.example .env
       - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config
-      - run: docker build -f backend/Dockerfile -t knowledge-rag-backend:ci .
+      - run: docker build -f backend/Dockerfile -t ecommerce-agent-backend:ci .

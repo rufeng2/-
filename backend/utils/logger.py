@@ -6,7 +6,7 @@ import sys
 from backend.config import settings
 
 
-def setup_logger(name: str = "knowledge-rag") -> logging.Logger:
+def setup_logger(name: str = "ecommerce-agent") -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
