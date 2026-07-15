@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_pytest_only_collects_tests_directory():
     config = (ROOT / "pytest.ini").read_text(encoding="utf-8")
     assert "testpaths = tests" in config
+    assert "pythonpath = ." in config
 
 
 def test_production_image_runs_as_non_root():
@@ -31,5 +32,6 @@ def test_ci_installs_runtime_dependencies_and_scans():
     assert "backend/requirements.txt" in workflow
     assert "backend/requirements-langchain.txt" in workflow
     assert "COMPOSE_PROJECT_NAME: knowledge-rag" in workflow
+    assert "cp .env.example .env" in workflow
     assert "pip-audit" in workflow
     assert "gitleaks" in workflow
