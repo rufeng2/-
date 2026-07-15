@@ -10,9 +10,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r backend/requirements.txt -r requirements-dev.txt pip-audit
       - run: python -m compileall backend
-      - run: pytest -q
+      - run: pytest tests -q
+      - run: pip-audit
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -32,3 +35,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config
+      - run: docker build -t knowledge-rag-backend:ci backend

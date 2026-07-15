@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-256-bit-secret-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    PRODUCTION_MAX_TOKEN_MINUTES: int = 120
 
     DASHSCOPE_API_KEY: str = ""
     DEEPSEEK_API_KEY: str = ""

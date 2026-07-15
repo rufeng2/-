@@ -1,0 +1,33 @@
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_pytest_only_collects_tests_directory():
+    config = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+    assert "testpaths = tests" in config
+
+
+def test_production_image_runs_as_non_root():
+    dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "USER app" in dockerfile
+    assert "--reload" not in dockerfile
+
+
+def test_production_compose_has_no_reload_or_source_mount():
+    compose = yaml.safe_load((ROOT / "docker-compose.production.yml").read_text(encoding="utf-8"))
+    backend = compose["services"]["backend"]
+    command = " ".join(backend.get("command", [])) if isinstance(backend.get("command"), list) else str(backend.get("command", ""))
+    assert "--reload" not in command
+    assert all("./backend:/app/backend" not in str(item) for item in backend.get("volumes", []))
+    assert backend["read_only"] is True
+
+
+def test_ci_installs_runtime_dependencies_and_scans():
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "backend/requirements.txt" in workflow
+    assert "pip-audit" in workflow
+    assert "gitleaks" in workflow

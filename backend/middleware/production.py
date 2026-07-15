@@ -13,6 +13,7 @@ from backend.db.models import AuditLog
 from backend.db.session import AsyncSessionLocal
 from backend.utils.logger import logger
 from backend.services.cache_service import cache_service
+from backend.security.production_config import password_rotation_allows
 
 REQUESTS = Counter("rag_http_requests_total", "HTTP requests", ["method", "path", "status"])
 LATENCY = Histogram("rag_http_request_duration_seconds", "HTTP request latency", ["method", "path"])
@@ -58,6 +59,18 @@ async def production_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     identity, role = _identity(request)
     path = request.url.path
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        try:
+            payload = jwt.decode(auth[7:], settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            if not password_rotation_allows(path, bool(payload.get("must_change_password", False))):
+                return JSONResponse(
+                    {"code": 403, "msg": "Password change required", "error": "PASSWORD_CHANGE_REQUIRED"},
+                    status_code=403,
+                    headers={"X-Request-ID": request_id},
+                )
+        except JWTError:
+            pass
     allowed, remaining = await _allow_request(identity)
     if not allowed:
         return JSONResponse({"code": 429, "msg": "Request rate or daily quota exceeded"}, status_code=429, headers={"Retry-After": "60", "X-Request-ID": request_id})

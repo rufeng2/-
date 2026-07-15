@@ -26,11 +26,12 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # ====================== JWT ======================
 
-def create_access_token(username: str, role: str = "user") -> str:
+def create_access_token(username: str, role: str = "user", must_change_password: bool = False) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": username,
         "role": role,
+        "must_change_password": must_change_password,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
@@ -57,7 +58,7 @@ async def get_current_user(
         role: str = payload.get("role", "user")
         if username is None:
             raise HTTPException(status_code=401, detail="无效的令牌")
-        return {"username": username, "role": role}
+        return {"username": username, "role": role, "must_change_password": bool(payload.get("must_change_password", False))}
     except JWTError:
         raise HTTPException(status_code=401, detail="无效的令牌")
 
