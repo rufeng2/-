@@ -5,7 +5,8 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from ldap3 import Connection, Server
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +57,7 @@ async def oidc_callback(code: str = Query(...), state: str = Query(...), db: Asy
         raise HTTPException(404, "OIDC is disabled")
     try:
         jwt.decode(state, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise HTTPException(400, "Invalid OIDC state") from exc
     async with httpx.AsyncClient(timeout=15) as client:
         discovery = (await client.get(settings.OIDC_ISSUER.rstrip("/") + "/.well-known/openid-configuration")).json()

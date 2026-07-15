@@ -13,7 +13,7 @@ from backend.services.advanced_document_parser import AdvancedDocumentParser, HA
 
 # 尝试导入文档解析库（非强制，缺失时给出清晰错误）
 try:
-    import PyPDF2
+    from pypdf import PdfReader
     HAS_PDF = True
 except ImportError:
     HAS_PDF = False
@@ -167,11 +167,11 @@ class DocumentParser:
 
     def _parse_pdf(self, path: Path, template: str = "general") -> Optional[ParseResult]:
         if not HAS_PDF:
-            logger.warning("PyPDF2 not installed, cannot parse PDF")
+            logger.warning("pypdf not installed, cannot parse PDF")
             return None
 
         with open(path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
+            reader = PdfReader(f)
             pages = []
             for i, page in enumerate(reader.pages):
                 text = page.extract_text() or ""

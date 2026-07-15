@@ -6,17 +6,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
 
 from backend.config import settings
 from backend.utils.logger import logger
-from backend.api import auth, documents, chat, admin, knowledge_bases, evaluation, enterprise_auth, operations
+from backend.api import auth, documents, chat, admin, knowledge_bases, evaluation, enterprise_auth, operations, health
 from backend.services.llm_gateway import llm_gateway
 from backend.services.reranker_service import reranker
-from backend.db.session import AsyncSessionLocal
-from backend.db.models import User
-from backend.utils.auth import hash_password
-from backend.db.migrations import ensure_runtime_schema
+from backend.security.production_config import assert_production_settings
 from backend.middleware.production import production_middleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -30,20 +26,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"LLM 模型: {settings.LLM_MODEL}")
     logger.info(f"嵌入维度: {settings.EMBEDDING_DIM}")
     logger.info("=" * 50)
-    await ensure_runtime_schema()
-    async with AsyncSessionLocal() as db:
-        admin = (await db.execute(
-            select(User).where(User.username == settings.ADMIN_USERNAME)
-        )).scalar_one_or_none()
-        if not admin:
-            db.add(User(
-                username=settings.ADMIN_USERNAME,
-                password=hash_password(settings.ADMIN_PASSWORD),
-                display_name="系统管理员",
-                role="admin",
-            ))
-            await db.commit()
-            logger.info("Administrator account initialized")
+    assert_production_settings(settings)
     yield
     logger.info("系统关闭")
 
@@ -79,6 +62,7 @@ app.include_router(knowledge_bases.router)
 app.include_router(evaluation.router)
 app.include_router(enterprise_auth.router)
 app.include_router(operations.router)
+app.include_router(health.router)
 
 
 @app.get("/api/health")

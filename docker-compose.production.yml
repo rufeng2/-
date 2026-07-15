@@ -1,4 +1,23 @@
 services:
+  backend:
+    image: ${BACKEND_IMAGE:-knowledge-rag-backend}:${APP_VERSION:-local}
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    volumes:
+      - uploaddata:/app/data/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/live', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 2G}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
   clamav:
     image: clamav/clamav:stable
     profiles: ["security"]
@@ -21,6 +40,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
     volumes:
       - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafanadata:/var/lib/grafana
     secrets: [grafana_admin_password]
   opensearch:
@@ -37,6 +57,7 @@ secrets:
   grafana_admin_password:
     file: ./secrets/grafana_admin_password
 volumes:
+  uploaddata:
   clamavdata:
   prometheusdata:
   grafanadata:
