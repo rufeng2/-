@@ -35,6 +35,7 @@ def test_ci_installs_runtime_dependencies_and_scans():
     assert "cp .env.example .env" in workflow
     assert "pip-audit" in workflow
     assert "gitleaks" in workflow
+    assert "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in workflow
 
 
 def test_runtime_dependencies_do_not_include_known_vulnerable_jose_or_pdf_packages():
