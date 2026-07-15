@@ -56,3 +56,13 @@ def test_recommendation_approval_flow():
     approved = client.post(f"/api/ecommerce/recommendations/{recommendation_id}/approve").json()["data"]
 
     assert approved["status"] == "approved"
+
+
+def test_campaign_plan_uses_selected_goal():
+    response = client.get("/api/ecommerce/campaigns/plan", params={"goal": "新品冷启动"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["goal"] == "新品冷启动"
+    assert data["theme"] == "新品冷启动策略"
+    assert data["tool_trace"][0]["input"]["goal"] == "新品冷启动"

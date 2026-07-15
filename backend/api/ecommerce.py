@@ -48,8 +48,9 @@ async def analyze(request: AgentAnalyzeRequest):
 @router.get("/campaigns/plan", response_model=ApiResponse)
 async def campaign_plan(goal: str = "大促增长"):
     dataset = _dataset()
-    plan, trace = EcommerceTools(dataset).generate_campaign_plan()
-    plan["goal"] = goal
+    normalized_goal = goal.strip() or "大促增长"
+    plan, trace = EcommerceTools(dataset).generate_campaign_plan(normalized_goal)
+    plan["goal"] = normalized_goal
     plan["tool_trace"] = [trace.model_dump()]
     return ApiResponse(data=plan)
 
