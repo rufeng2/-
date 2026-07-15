@@ -70,13 +70,29 @@ def test_login_fails_open_when_rate_limiter_is_unavailable_in_development(monkey
     assert calls["fail_closed"] is False
 
 
-def test_ecommerce_agent_fails_open_when_rate_limiter_is_unavailable_in_development(monkeypatch):
+def test_ecommerce_agent_skips_external_controls_in_development(monkeypatch):
     monkeypatch.setattr(production.settings, "APP_ENV", "development")
 
-    response, calls = _run_middleware(monkeypatch, "POST", "/api/ecommerce/agent/analyze")
+    async def fail_allow_request(identity: str, fail_closed: bool = False):
+        raise AssertionError("local ecommerce demo should not call Redis rate limiter")
+
+    class FailingSession:
+        async def __aenter__(self):
+            raise AssertionError("local ecommerce demo should not write audit logs")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    async def call_next(_request):
+        return JSONResponse({"ok": True})
+
+    monkeypatch.setattr(production, "_allow_request", fail_allow_request)
+    monkeypatch.setattr(production, "AsyncSessionLocal", lambda: FailingSession())
+
+    response = asyncio.run(production.production_middleware(_request("POST", "/api/ecommerce/agent/analyze"), call_next))
 
     assert response.status_code == 200
-    assert calls["fail_closed"] is False
+    assert response.headers["X-RateLimit-Remaining"] == "local-demo"
 
 
 def test_register_fails_closed_when_rate_limiter_is_unavailable_in_production(monkeypatch):

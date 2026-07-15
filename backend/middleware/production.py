@@ -76,6 +76,10 @@ def _rate_limit_fail_closed(method: str, path: str) -> bool:
     return method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
 
 
+def _skip_external_controls(path: str) -> bool:
+    return settings.APP_ENV.lower() != "production" and any(path.startswith(prefix) for prefix in LOCAL_DEMO_FAIL_OPEN_PREFIXES)
+
+
 async def production_middleware(request: Request, call_next):
     started = time.perf_counter()
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
@@ -94,8 +98,12 @@ async def production_middleware(request: Request, call_next):
                 )
         except InvalidTokenError:
             pass
-    fail_closed = _rate_limit_fail_closed(request.method, path)
-    allowed, remaining, limiter_unavailable = await _allow_request(identity, fail_closed=fail_closed)
+    skip_external_controls = _skip_external_controls(path)
+    if skip_external_controls:
+        allowed, remaining, limiter_unavailable = True, "local-demo", False
+    else:
+        fail_closed = _rate_limit_fail_closed(request.method, path)
+        allowed, remaining, limiter_unavailable = await _allow_request(identity, fail_closed=fail_closed)
     if not allowed:
         if limiter_unavailable:
             return JSONResponse(
@@ -124,7 +132,7 @@ async def production_middleware(request: Request, call_next):
 
     response.headers["X-Request-ID"] = request_id
     response.headers["X-RateLimit-Remaining"] = str(remaining)
-    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and path != "/api/login":
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and path != "/api/login" and not skip_external_controls:
         try:
             async with AsyncSessionLocal() as db:
                 db.add(AuditLog(
