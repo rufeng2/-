@@ -3,10 +3,15 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parent.parent / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     APP_ENV: str = "development"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
@@ -34,6 +39,9 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "deepseek-chat"
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 4096
+    PROVIDER_TIMEOUT_SECONDS: float = 45.0
+    PROVIDER_CIRCUIT_FAILURES: int = 3
+    PROVIDER_CIRCUIT_RECOVERY_SECONDS: float = 30.0
 
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     EMBEDDING_DIM: int = 1024
@@ -97,12 +105,6 @@ class Settings(BaseSettings):
                 value = Path(secret_file).read_text(encoding="utf-8").strip()
                 if value:
                     object.__setattr__(self, name, value)
-
-    class Config:
-        env_file = str(Path(__file__).resolve().parent.parent / ".env")
-        env_file_encoding = "utf-8"
-        extra = "ignore"
-
 
 @lru_cache()
 def get_settings() -> Settings:

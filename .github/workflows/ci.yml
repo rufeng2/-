@@ -35,4 +35,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config
-      - run: docker build -t knowledge-rag-backend:ci backend
+      - run: docker build -f backend/Dockerfile -t knowledge-rag-backend:ci .

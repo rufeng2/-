@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Query, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
@@ -19,6 +19,7 @@ from backend.security.rbac import require_permission
 from backend.services.indexing_service import index_document
 from backend.tasks.parse_task import parse_document
 from backend.services.storage_service import storage_service
+from backend.services.dependency_health import capability_available, dependency_health
 from backend.config import settings
 from backend.utils.logger import logger
 from backend.security.file_security import scan_with_clamav, validate_file
@@ -44,6 +45,8 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
 ):
     """上传文档"""
+    if not capability_available(await dependency_health.snapshot(), "documents.upload"):
+        raise HTTPException(status_code=503, detail={"error": "INDEXING_DEPENDENCY_UNAVAILABLE"})
     # 校验文件类型
     filename = file.filename or "unknown"
     ext = Path(filename).suffix.lower()
@@ -297,6 +300,8 @@ async def reindex_document(
     user: dict = Depends(require_permission("documents.write")),
     db: AsyncSession = Depends(get_db),
 ):
+    if not capability_available(await dependency_health.snapshot(), "documents.reindex"):
+        raise HTTPException(status_code=503, detail={"error": "INDEXING_DEPENDENCY_UNAVAILABLE"})
     if chunk_template not in {"general", "sentence", "table", "qa"}:
         return ApiResponse(code=400, msg="无效的切分模板")
     try:

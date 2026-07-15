@@ -11,6 +11,16 @@ from backend.services.observability import REFLECTION_EVENTS
 from backend.utils.logger import logger
 
 
+_HIGH_RISK_QUERY = re.compile(r"(密码|密钥|凭据|身份证|银行卡|工资|薪酬|个人信息|机密|管理员|权限|删除|导出)", re.I)
+
+
+def requires_buffered_validation(question: str, results: list[dict], has_images: bool) -> bool:
+    if has_images or _HIGH_RISK_QUERY.search(question):
+        return True
+    scores = [float(item.get("rerank_score", item.get("score", 0.0)) or 0.0) for item in results]
+    return not scores or max(scores) < 0.35
+
+
 @dataclass(frozen=True)
 class ReflectionResult:
     passed: bool

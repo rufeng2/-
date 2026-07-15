@@ -2,6 +2,7 @@
 import asyncio
 import time
 import uuid
+import re
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -20,6 +21,15 @@ LATENCY = Histogram("rag_http_request_duration_seconds", "HTTP request latency",
 ERRORS = Counter("rag_http_errors_total", "Unhandled HTTP errors", ["path"])
 EXPENSIVE_PATHS = ("/api/chat/send", "/api/documents/upload", "/api/evaluation/runs")
 _expensive = asyncio.Semaphore(settings.MAX_CONCURRENT_EXPENSIVE_REQUESTS)
+_UUID_SEGMENT = re.compile(r"^[0-9a-f]{8}-[0-9a-f-]{27,}$", re.I)
+_NUMBER_SEGMENT = re.compile(r"^\d+$")
+
+
+def normalized_route(path: str) -> str:
+    return "/".join(
+        "{id}" if _UUID_SEGMENT.fullmatch(segment) or _NUMBER_SEGMENT.fullmatch(segment) else segment
+        for segment in path.split("/")
+    )
 
 
 def _identity(request: Request) -> tuple[str, str]:
@@ -34,7 +44,7 @@ def _identity(request: Request) -> tuple[str, str]:
     return (forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown"), "")
 
 
-async def _allow_request(identity: str) -> tuple[bool, int]:
+async def _allow_request(identity: str, fail_closed: bool = False) -> tuple[bool, int, bool]:
     redis = cache_service.redis
     try:
         minute = int(time.time() // 60)
@@ -48,10 +58,10 @@ async def _allow_request(identity: str) -> tuple[bool, int]:
         pipe.expire(day_key, 172800)
         minute_count, _, day_count, _ = await pipe.execute()
         allowed = minute_count <= settings.RATE_LIMIT_PER_MINUTE and day_count <= settings.DAILY_REQUEST_QUOTA
-        return allowed, max(0, settings.RATE_LIMIT_PER_MINUTE - int(minute_count))
+        return allowed, max(0, settings.RATE_LIMIT_PER_MINUTE - int(minute_count)), False
     except Exception as exc:
-        logger.warning(f"Rate limiter unavailable, failing open: {exc}")
-        return True, settings.RATE_LIMIT_PER_MINUTE
+        logger.warning("Rate limiter unavailable fail_closed=%s: %s", fail_closed, exc)
+        return not fail_closed, settings.RATE_LIMIT_PER_MINUTE, True
 
 
 async def production_middleware(request: Request, call_next):
@@ -59,6 +69,7 @@ async def production_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     identity, role = _identity(request)
     path = request.url.path
+    metric_path = normalized_route(path)
     auth = request.headers.get("authorization", "")
     if auth.startswith("Bearer "):
         try:
@@ -71,8 +82,15 @@ async def production_middleware(request: Request, call_next):
                 )
         except JWTError:
             pass
-    allowed, remaining = await _allow_request(identity)
+    fail_closed = request.method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
+    allowed, remaining, limiter_unavailable = await _allow_request(identity, fail_closed=fail_closed)
     if not allowed:
+        if limiter_unavailable:
+            return JSONResponse(
+                {"code": 503, "msg": "Rate limit service unavailable", "error": "REDIS_REQUIRED"},
+                status_code=503,
+                headers={"Retry-After": "30", "X-Request-ID": request_id},
+            )
         return JSONResponse({"code": 429, "msg": "Request rate or daily quota exceeded"}, status_code=429, headers={"Retry-After": "60", "X-Request-ID": request_id})
 
     status_code = 500
@@ -84,13 +102,13 @@ async def production_middleware(request: Request, call_next):
             response = await call_next(request)
         status_code = response.status_code
     except Exception:
-        ERRORS.labels(path=path).inc()
+        ERRORS.labels(path=metric_path).inc()
         logger.exception(f"Unhandled request error request_id={request_id} path={path}")
         raise
     finally:
         elapsed = time.perf_counter() - started
-        REQUESTS.labels(method=request.method, path=path, status=str(status_code)).inc()
-        LATENCY.labels(method=request.method, path=path).observe(elapsed)
+        REQUESTS.labels(method=request.method, path=metric_path, status=str(status_code)).inc()
+        LATENCY.labels(method=request.method, path=metric_path).observe(elapsed)
 
     response.headers["X-Request-ID"] = request_id
     response.headers["X-RateLimit-Remaining"] = str(remaining)

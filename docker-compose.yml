@@ -73,8 +73,8 @@ services:
   # ==================== FastAPI 后端 ====================
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-backend
     restart: unless-stopped
     ports:
@@ -101,8 +101,8 @@ services:
   # ==================== Celery Worker ====================
   celery_worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-celery
     restart: unless-stopped
     env_file:
@@ -127,8 +127,8 @@ services:
   # ==================== Celery Beat（定时任务） ====================
   celery_beat:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: rag-celery-beat
     restart: unless-stopped
     env_file:

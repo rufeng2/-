@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.utils.logger import logger
-from backend.api import auth, documents, chat, admin, knowledge_bases, evaluation, enterprise_auth, operations
+from backend.api import auth, documents, chat, admin, knowledge_bases, evaluation, enterprise_auth, operations, health
 from backend.services.llm_gateway import llm_gateway
 from backend.services.reranker_service import reranker
 from backend.security.production_config import assert_production_settings
@@ -62,6 +62,7 @@ app.include_router(knowledge_bases.router)
 app.include_router(evaluation.router)
 app.include_router(enterprise_auth.router)
 app.include_router(operations.router)
+app.include_router(health.router)
 
 
 @app.get("/api/health")
