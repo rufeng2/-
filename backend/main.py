@@ -5,7 +5,7 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from backend.api import admin, auth, chat, documents, enterprise_auth, evaluation, health, knowledge_bases, operations
+from backend.api import admin, auth, chat, documents, ecommerce, enterprise_auth, evaluation, health, knowledge_bases, operations
 from backend.config import settings
 from backend.middleware.production import production_middleware
 from backend.security.production_config import assert_production_settings
@@ -59,6 +59,7 @@ app.include_router(evaluation.router)
 app.include_router(enterprise_auth.router)
 app.include_router(operations.router)
 app.include_router(health.router)
+app.include_router(ecommerce.router)
 
 
 @app.get("/api/health")
