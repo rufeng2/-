@@ -29,3 +29,20 @@ def test_frontend_api_exports_ecommerce_client():
     assert "export const ecommerceAPI" in client
     assert 'client.get("/ecommerce/dashboard")' in client
     assert 'client.post("/ecommerce/agent/analyze"' in client
+
+
+def test_ecommerce_pages_render_agent_and_analysis_terms():
+    pages = [
+        "frontend/src/views/Ecommerce/Dashboard.vue",
+        "frontend/src/views/Ecommerce/AgentWorkspace.vue",
+        "frontend/src/views/Ecommerce/Products.vue",
+        "frontend/src/views/Ecommerce/Campaigns.vue",
+        "frontend/src/views/Ecommerce/Recommendations.vue",
+    ]
+    content = "\n".join(read(path) for path in pages)
+
+    assert "GMV" in content
+    assert "工具调用轨迹" in content
+    assert "数据证据" in content
+    assert "商品分层" in content
+    assert "建议审批" in content
