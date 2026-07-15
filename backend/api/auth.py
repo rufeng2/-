@@ -1,4 +1,7 @@
 """Authentication API: local accounts, optional LDAP, registration and token checks."""
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,12 +15,76 @@ from backend.utils.auth import create_access_token, get_current_user, hash_passw
 from backend.utils.logger import logger
 
 router = APIRouter(prefix="/api", tags=["authentication"])
+LOCAL_AUTH_STORE_PATH = Path("data/local_auth_users.json")
+
+
+def _local_auth_enabled() -> bool:
+    return settings.APP_ENV.lower() != "production"
+
+
+def _read_local_users() -> dict:
+    try:
+        if not LOCAL_AUTH_STORE_PATH.exists():
+            return {}
+        return json.loads(LOCAL_AUTH_STORE_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning(f"Local demo auth store read failed: {exc}")
+        return {}
+
+
+def _write_local_users(users: dict) -> None:
+    LOCAL_AUTH_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_AUTH_STORE_PATH.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+async def _rollback_quietly(db: AsyncSession) -> None:
+    try:
+        await db.rollback()
+    except Exception:
+        pass
+
+
+def _local_register(req: RegisterRequest) -> TokenResponse:
+    username, password = req.username.strip(), req.password
+    if len(username) < 3:
+        return TokenResponse(code=400, msg="Username must contain at least 3 characters")
+    if len(password) < 8:
+        return TokenResponse(code=400, msg="Password must contain at least 8 characters")
+    users = _read_local_users()
+    if username in users:
+        return TokenResponse(code=400, msg="Username already exists")
+    users[username] = {
+        "password": hash_password(password),
+        "display_name": req.display_name or username,
+        "role": "user",
+        "is_active": True,
+    }
+    _write_local_users(users)
+    return TokenResponse(msg="Registration successful", token=create_access_token(username), role="user", username=username)
+
+
+def _local_login(username: str, password: str) -> TokenResponse:
+    users = _read_local_users()
+    user = users.get(username)
+    if not user or not verify_password(password, user.get("password", "")):
+        return TokenResponse(code=401, msg="Invalid username or password")
+    if not user.get("is_active", True):
+        return TokenResponse(code=403, msg="Account is disabled")
+    role = user.get("role", "user")
+    return TokenResponse(msg="Login successful", token=create_access_token(username, role), role=role, username=username)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     username, password = req.username.strip(), req.password
-    user = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
+    try:
+        user = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
+    except Exception as exc:
+        if _local_auth_enabled():
+            await _rollback_quietly(db)
+            logger.warning(f"Database unavailable during login; using local demo auth store: {exc}")
+            return _local_login(username, password)
+        raise
 
     if settings.LDAP_ENABLED:
         try:
@@ -44,11 +111,18 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         return TokenResponse(code=400, msg="Username must contain at least 3 characters")
     if len(password) < 8:
         return TokenResponse(code=400, msg="Password must contain at least 8 characters")
-    if (await db.execute(select(User).where(User.username == username))).scalar_one_or_none():
-        return TokenResponse(code=400, msg="Username already exists")
-    user = User(username=username, password=hash_password(password), display_name=req.display_name or username)
-    db.add(user)
-    await db.flush()
+    try:
+        if (await db.execute(select(User).where(User.username == username))).scalar_one_or_none():
+            return TokenResponse(code=400, msg="Username already exists")
+        user = User(username=username, password=hash_password(password), display_name=req.display_name or username)
+        db.add(user)
+        await db.flush()
+    except Exception as exc:
+        if _local_auth_enabled():
+            await _rollback_quietly(db)
+            logger.warning(f"Database unavailable during registration; using local demo auth store: {exc}")
+            return _local_register(req)
+        raise
     logger.info(f"User registered: {username}")
     return TokenResponse(msg="Registration successful", token=create_access_token(username), role="user", username=username)
 

@@ -21,6 +21,7 @@ REQUESTS = Counter("rag_http_requests_total", "HTTP requests", ["method", "path"
 LATENCY = Histogram("rag_http_request_duration_seconds", "HTTP request latency", ["method", "path"])
 ERRORS = Counter("rag_http_errors_total", "Unhandled HTTP errors", ["path"])
 EXPENSIVE_PATHS = ("/api/chat/send", "/api/documents/upload", "/api/evaluation/runs")
+LOCAL_AUTH_PATHS = {"/api/login", "/api/register"}
 _expensive = asyncio.Semaphore(settings.MAX_CONCURRENT_EXPENSIVE_REQUESTS)
 _UUID_SEGMENT = re.compile(r"^[0-9a-f]{8}-[0-9a-f-]{27,}$", re.I)
 _NUMBER_SEGMENT = re.compile(r"^\d+$")
@@ -65,6 +66,12 @@ async def _allow_request(identity: str, fail_closed: bool = False) -> tuple[bool
         return not fail_closed, settings.RATE_LIMIT_PER_MINUTE, True
 
 
+def _rate_limit_fail_closed(method: str, path: str) -> bool:
+    if settings.APP_ENV.lower() != "production" and path in LOCAL_AUTH_PATHS:
+        return False
+    return method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
+
+
 async def production_middleware(request: Request, call_next):
     started = time.perf_counter()
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
@@ -83,7 +90,7 @@ async def production_middleware(request: Request, call_next):
                 )
         except InvalidTokenError:
             pass
-    fail_closed = request.method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
+    fail_closed = _rate_limit_fail_closed(request.method, path)
     allowed, remaining, limiter_unavailable = await _allow_request(identity, fail_closed=fail_closed)
     if not allowed:
         if limiter_unavailable:
