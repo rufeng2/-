@@ -35,3 +35,11 @@ def test_ci_installs_runtime_dependencies_and_scans():
     assert "cp .env.example .env" in workflow
     assert "pip-audit" in workflow
     assert "gitleaks" in workflow
+
+
+def test_runtime_dependencies_do_not_include_known_vulnerable_jose_or_pdf_packages():
+    requirements = (ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").lower()
+    assert "python-jose" not in requirements
+    assert "pypdf2" not in requirements
+    assert "pyjwt[crypto]" in requirements
+    assert "pypdf>=" in requirements

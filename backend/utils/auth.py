@@ -7,7 +7,8 @@ from typing import Optional
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 
 from backend.config import settings
 
@@ -59,7 +60,7 @@ async def get_current_user(
         if username is None:
             raise HTTPException(status_code=401, detail="无效的令牌")
         return {"username": username, "role": role, "must_change_password": bool(payload.get("must_change_password", False))}
-    except JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="无效的令牌")
 
 

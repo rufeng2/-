@@ -6,7 +6,8 @@ import re
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from prometheus_client import Counter, Histogram
 
 from backend.config import settings
@@ -38,7 +39,7 @@ def _identity(request: Request) -> tuple[str, str]:
         try:
             payload = jwt.decode(auth[7:], settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             return str(payload.get("sub", "anonymous")), str(payload.get("role", ""))
-        except JWTError:
+        except InvalidTokenError:
             pass
     forwarded = request.headers.get("x-forwarded-for", "")
     return (forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown"), "")
@@ -80,7 +81,7 @@ async def production_middleware(request: Request, call_next):
                     status_code=403,
                     headers={"X-Request-ID": request_id},
                 )
-        except JWTError:
+        except InvalidTokenError:
             pass
     fail_closed = request.method in {"POST", "PUT", "PATCH", "DELETE"} or any(path.startswith(prefix) for prefix in EXPENSIVE_PATHS)
     allowed, remaining, limiter_unavailable = await _allow_request(identity, fail_closed=fail_closed)
