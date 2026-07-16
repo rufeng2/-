@@ -1,6 +1,6 @@
 # 企业级多模态知识库 RAG 问答系统
 
-[![CI](https://github.com/rufeng2/-/actions/workflows/ci.yml/badge.svg)](https://github.com/rufeng2/-/actions/workflows/ci.yml)
+[![CI](https://github.com/rufeng2/-RAG-/actions/workflows/ci.yml/badge.svg)](https://github.com/rufeng2/-RAG-/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
